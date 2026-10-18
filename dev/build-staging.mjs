@@ -19,7 +19,7 @@ const head=spawnSync('git',['rev-parse','--short','HEAD'],{cwd:root,encoding:'ut
 if(spawnSync('git',['status','--porcelain'],{cwd:root,encoding:'utf8'}).stdout.trim())throw Error('Commit first: the package must match a commit');
 const gateUser='rubizh',gatePassword=secret(18);
 const gateHash=php(`echo password_hash(${JSON.stringify(gatePassword)},PASSWORD_DEFAULT);`).stdout.trim();
-const site=await startSite({enableV3:true,extraConfig:",'environment'=>'staging','mono_mock'=>true,'np_mock'=>true,'np_ttn_enabled'=>true,'crm_enabled'=>true"});
+const site=await startSite({enableV3:true,extraConfig:",'environment'=>'staging','mono_mock'=>true,'mono_mock_page'=>true,'np_mock'=>true,'np_ttn_enabled'=>true,'crm_enabled'=>true"});
 const cli=(script,args=[],input)=>{const r=spawnSync(runtime+'/bin/php8.4',[...phpArgs,path.join(site.site,script),...args],{env:phpEnv,encoding:'utf8',input,timeout:300000});if(r.status!==0)throw Error(script+' failed: '+r.stdout+r.stderr);return r.stdout;};
 const report={commit:head,built_at:new Date().toISOString()};
 try{
@@ -29,6 +29,18 @@ try{
  const dumpJson=path.join(out,'staging-catalogue.json');
  const r=spawnSync(process.execPath,['--max-old-space-size=6144',path.join(pim,'audit/staging-dump-5-5.cjs'),backup,site.base,PIM_KEY,dumpJson,'500'],{encoding:'utf8',timeout:1800000,stdio:['ignore','pipe','pipe']});
  if(r.status!==0)throw Error('catalogue: '+r.stdout+r.stderr);report.catalogue=JSON.parse(readFileSync(dumpJson,'utf8'));
+ // Stage 5.5.3 (owner): two 1 UAH test products in a batch of their own (template: a contract-v3 batch prepared by PIM —
+ // RZ_TEMPLATE_CHUNKS, default the run11 owner-preview chunks); removed before the opening (dev/remove-test-products.php).
+ const {testProducts,testBatchId}=await import(path.join(root,'dev/test-products.mjs'));
+ const tplFile=process.env.RZ_TEMPLATE_CHUNKS||path.join(os.homedir(),'Projects/rubizh-supplier-files/out/run11/owner-preview-chunks.json.gz');
+ const tpl=JSON.parse(zlib.gunzipSync(readFileSync(tplFile)).toString('utf8'));const {products:_p,...tplHead}=tpl[0];
+ const tp=await site.post('/api/pim/sync',{...tplHead,batch_id:testBatchId(),chunk_index:0,chunk_count:1,hide_ids:[],products:testProducts(tpl.flatMap(c=>c.products))},{'Authorization':'Bearer '+PIM_KEY});
+ if(tp.status!==200)throw Error('test products: '+tp.status+' '+JSON.stringify(tp.data).slice(0,600));report.test_products=['rubizh-test-pay-now','rubizh-test-preorder'];
+ // Stage 5.5.3: the package is a snapshot — with PIM's 72 h / 8 days the test checkout closed three days after the build and
+ // the catalogue disappeared after eight. Staging only: the longest policy the site accepts (336 h / 60 days); production gets
+ // PIM's own policy with its first sync.
+ php(`require '${site.site}/api/lib.php';require_once '${site.site}/shop/stock-freshness.php';$db=db();shopFreshnessPolicyStore($db,['version'=>1,'pay_fresh_hours'=>336,'sell_max_days'=>60]);$GLOBALS['rubizh_freshness_policy']=[];shopFreshnessSweep($db,true,null,true);`);
+ report.freshness_policy_staging={pay_fresh_hours:336,sell_max_days:60};
  // CRM test users of every role.
  const roles={OWNER:'owner',MANAGER:'manager',ACCOUNTANT:'accountant',SUPPORT:'support',WAREHOUSE:'warehouse'},users=[];
  for(const [role,name] of Object.entries(roles)){const password=secret(15);cli('dev/staff-user.php',['--email='+name+'@staging.rubizh.shop','--name=Тест '+role,'--role='+role,'--reason=Stage 5.5 closed staging test account'],password+'\n');users.push({role,email:name+'@staging.rubizh.shop',password});}
@@ -84,6 +96,7 @@ return [
   'pim_v3_sync' => true,
   'pim_legacy_sync' => false,
   'mono_mock' => true,
+  'mono_mock_page' => true,
   'np_mock' => true,
   'np_ttn_enabled' => true,
   'crm_enabled' => true,

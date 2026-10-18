@@ -11,7 +11,7 @@ function shopSavePreferences(PDO $db,string $id,array $input): void {
  $p=shopPreferences($db,$id);foreach(['theme','donation_channel','donation_phone'] as $key)if(isset($input[$key])&&is_string($input[$key]))$p[$key]=trim($input[$key]);if(!in_array($p['theme'],['light','dark','system'],true)||!in_array($p['donation_channel'],['viber','telegram'],true))throw new RuntimeException('Перевірте тему та месенджер.');
  $phone=preg_replace('/\D/','',$p['donation_phone']);if(preg_match('/^0\d{9}$/D',$phone))$phone='38'.$phone;if($phone!==''&&!preg_match('/^380\d{9}$/D',$phone))throw new RuntimeException('Перевірте телефон для скріна донату.');
  $db->prepare('INSERT INTO rubizh_customer_preferences(customer_id,theme,donation_channel,donation_phone,updated_at) VALUES(?,?,?,?,UTC_TIMESTAMP()) ON DUPLICATE KEY UPDATE theme=VALUES(theme),donation_channel=VALUES(donation_channel),donation_phone=VALUES(donation_phone),updated_at=VALUES(updated_at)')->execute([$id,$p['theme'],$p['donation_channel'],$phone===''?'':'+'.$phone]);
- setcookie('rubizh_theme',$p['theme'],['expires'=>time()+31536000,'path'=>'/','secure'=>true,'httponly'=>false,'samesite'=>'Lax']);
+ setcookie('rubizh_theme',$p['theme'],['expires'=>time()+31536000,'path'=>'/','secure'=>rubizhCookieSecure(),'httponly'=>false,'samesite'=>'Lax']);
 }
 function shopTimelineEvent(PDO $db,int $id,string $event,string $key,string $time,array $detail=[]): void {$db->prepare('INSERT IGNORE INTO rubizh_order_timeline(order_id,event,event_key,occurred_at,detail_json) VALUES(?,?,?,?,?)')->execute([$id,$event,$key,$time,json_encode($detail,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR)]);}
 function shopTimeline(PDO $db,array $o): array {

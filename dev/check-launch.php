@@ -42,6 +42,8 @@ try{
  $report['analytics']=['ga4'=>preg_match('/^G-[A-Z0-9]{5,20}$/D',(string)($settings['ga4_id']??$c['ga4_id']??''))?'configured':'not_configured','meta'=>preg_match('/^\d{5,30}$/D',(string)($settings['meta_pixel_id']??$c['meta_pixel_id']??''))?'configured':'not_configured'];
  $report['photos']=$db->query("SELECT status,COUNT(*) count FROM photos GROUP BY status")->fetchAll(PDO::FETCH_KEY_PAIR);
  $report['source_attributes_missing']=(int)$db->query("SELECT COUNT(*) FROM products WHERE visible=1 AND (attributes IS NULL OR TRIM(attributes) IN ('','{}','[]'))")->fetchColumn();
+ // Stage 5.5.3: the 1 UAH test products of the preview / closed staging must be off the site before the opening.
+ $tp=$db->prepare("SELECT COUNT(*) FROM products WHERE visible=1 AND id IN ('rubizh-test-pay-now','rubizh-test-preorder')");$tp->execute();$report['test_products_visible']=(int)$tp->fetchColumn();$failed=$failed||$report['test_products_visible']>0;
 }catch(Throwable $e){$report['database']='failed';$failed=true;}
 $failed=$failed||in_array($report['smtp_auth'],['failed','not_configured'],true);
 echo json_encode($report,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES|JSON_THROW_ON_ERROR)."\n";exit($failed?2:0);

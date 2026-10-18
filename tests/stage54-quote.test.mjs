@@ -95,6 +95,8 @@ test('storefront bundles: QUOTE label in the new bundle; earlier bundles kept by
  // Stage 5.4.1: the D-62 slow-CPU anchor fix shipped as shop-client.2026101702.js; the stage 5.4 bundle is kept as it was.
  // Stage 5.5: D-79 shipped as shop-client.2026101801.js; the 5.4.1 bundle is kept as it was.
  // Stage 5.5 review (a11y): the payment choice state and the «no payment method» notice shipped as shop-client.2026101802.js.
+ // Stage 5.5.3: the closed staging test bank page shipped as shop-client.2026101803.js.
+ assert.equal(sha('assets/shop-client.2026101802.js'),'b11baf5ea1eccfd8d9909e800821eca819df4f7f38d080383b4667d94f785564','stage 5.5 a11y bundle kept');
  assert.equal(sha('assets/shop-client.2026101801.js'),'dd379cc3cb432dcf7c6f88a41f68fee2805a3881358f86ef31c906e72b0ba5c2','stage 5.5 D-79 bundle kept');
  assert.equal(sha('assets/shop-client.2026101702.js'),'501e0a838e093cf4af277095a8148278125e12d836bc7935247f5e52aea44eef','stage 5.4.1 bundle kept');
  assert.equal(sha('assets/shop-client.2026101701.js'),'90da45ae05a094918a82cdb097ab8b3cc647411badd67c033f94a090dbb6c1c6','stage 5.4 bundle kept');

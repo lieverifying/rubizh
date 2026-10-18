@@ -65,11 +65,14 @@ function rubizhNetworkIdentity(?string $address=null): string {
     $address??=rubizhClientAddress();$packed=@inet_pton($address);
     return $packed!==false&&strlen($packed)===16?inet_ntop(substr($packed,0,8).str_repeat("\0",8)).'/64':$address;
 }
+// Stage 5.5.3: cookies are Secure everywhere except the local owner stand (PHP built-in server, staging_allow_loopback, a loopback
+// client): Safari drops Secure cookies on http://127.0.0.1, so sign-in and checkout failed there. Production never matches.
+function rubizhCookieSecure(): bool {return !(PHP_SAPI==='cli-server'&&function_exists('cfg')&&cfg('staging_allow_loopback')===true&&in_array($_SERVER['REMOTE_ADDR']??'',['127.0.0.1','::1'],true));}
 function rubizhDeviceIdentity(): string {
     $id=$_COOKIE['rz_dev']??'';
     if(!is_string($id)||!preg_match('/^[a-f0-9]{64}$/D',$id)){
         $id=bin2hex(random_bytes(32));$_COOKIE['rz_dev']=$id;
-        if(!headers_sent())setcookie('rz_dev',$id,['expires'=>time()+31536000,'path'=>'/','secure'=>!(PHP_SAPI==='cli-server'&&function_exists('cfg')&&cfg('staging_allow_loopback')===true&&in_array($_SERVER['REMOTE_ADDR']??'',['127.0.0.1','::1'],true)),'httponly'=>true,'samesite'=>'Lax']);
+        if(!headers_sent())setcookie('rz_dev',$id,['expires'=>time()+31536000,'path'=>'/','secure'=>rubizhCookieSecure(),'httponly'=>true,'samesite'=>'Lax']);
     }
     return $id;
 }

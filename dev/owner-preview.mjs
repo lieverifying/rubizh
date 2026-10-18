@@ -12,7 +12,7 @@ import {existsSync,mkdtempSync,mkdirSync,writeFileSync,readFileSync,rmSync,renam
 import {homedir,tmpdir} from 'node:os';
 import path from 'node:path';
 import {gunzipSync} from 'node:zlib';
-import {createHash,generateKeyPairSync} from 'node:crypto';
+import {createHash} from 'node:crypto';
 const root=path.resolve(import.meta.dirname,'..');
 const argv=process.argv.slice(2),flag=f=>argv.includes(f);
 const cache=path.join(process.env.XDG_CACHE_HOME||path.join(homedir(),'.cache'),'rubizh-owner-preview');
@@ -107,45 +107,25 @@ if(!process.env.RUBIZH_CRM_DIR||!existsSync(process.env.RUBIZH_CRM_DIR+'/dist/in
 
 // 4. Site + CRM: the same stand as the CRM E2E tests (staging mode, monobank mock, NP mock, five staff roles).
 const {startCrm,roles5,staffEmail,password}=await import('../tests/helpers/crm-fixture.mjs');
-const {freshWire,PIM_KEY,php,phpArgs}=await import('../tests/helpers/site-fixture.mjs');fixturePhpArgs=phpArgs;
+const {freshWire,PIM_KEY,php,phpArgs}=await import('../tests/helpers/site-fixture.mjs');const {testProducts,testBatchId}=await import('./test-products.mjs');fixturePhpArgs=phpArgs;
 const vat=flag('--without-vat-note')?",'invoice_vat_note'=>''":'';
 try{site=await startCrm({frontend:true,npMock:true,extraConfig:vat});}catch(e){console.error(e.message);await stop(1);}
 // SMS login with the code shown on screen (D-80: staging without a provider) — nothing is sent.
 writeFileSync(path.join(site.site,'auth/config.php'),"<?php return ['sms_enabled'=>true,'google_enabled'=>false,'noreply_password'=>'','auth_secret'=>'pim-v3-fixture-secret-at-least-forty-characters'];");
 // Same stand settings as the E2E tests: loopback origin for the buyer's cookies, NP recovery columns, a confirmed NP sender.
-writeFileSync(path.join(site.site,'api/config.php'),readFileSync(path.join(site.site,'api/config.php'),'utf8').replace(/\];\s*$/,",'staging_allow_loopback'=>true];"));
+writeFileSync(path.join(site.site,'api/config.php'),readFileSync(path.join(site.site,'api/config.php'),'utf8').replace(/\];\s*$/,",'staging_allow_loopback'=>true,'mono_mock_page'=>true];"));
 php(`define('RUBIZH_AUTH_NO_SESSION',true);require '${site.site}/auth/bootstrap.php';npRecoveryMigrate(shopStoreDatabase());`);
 const npRef=seed=>{const h=createHash('sha256').update('np-mock|'+seed).digest('hex');return `${h.slice(0,8)}-${h.slice(8,12)}-${h.slice(12,16)}-${h.slice(16,20)}-${h.slice(20,32)}`;};
 site.sql(`UPDATE rubizh_sender_profiles SET city='Київ',region='Київська',branch='1',city_ref='${npRef('city:kyiv')}',warehouse_ref='${npRef('wh:'+npRef('city:kyiv')+':1')}',sender_ref='${npRef('sender')}',contact_ref='${npRef('contact')}',phone='+380671234567',confirmed=1`);
-// monobank test page: the bank mock's invoice address (pay.mbnk.biz/mock…) is shown as a local page of the stand; «Оплатити»
-// sends the webhook signed by the stand's own key, exactly like the bank. The storefront bundle is served with the local
-// address added to its payment-address check — on the stand only, the file on disk is unchanged.
-const {publicKey,privateKey}=generateKeyPairSync('ec',{namedCurve:'prime256v1'});
-writeFileSync(path.join(site.dir,'preview-mono.pem'),privateKey.export({type:'pkcs8',format:'pem'}));
-site.sql(`UPDATE meta SET v='${Buffer.from(publicKey.export({type:'spki',format:'pem'})).toString('base64')}' WHERE k='mono_public_key'`);
-writeFileSync(path.join(site.dir,'preview-pay.php'),String.raw`<?php
-$db=new PDO('mysql:unix_socket=${process.env.RUBIZH_TEST_MYSQL_SOCKET};dbname=${site.schema};charset=utf8mb4','root','',[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION]);
-$q=$db->prepare('SELECT order_id,amount,status FROM rubizh_mono_invoices WHERE invoice_id=?');$q->execute([$invoice]);$inv=$q->fetch(PDO::FETCH_ASSOC);
-if(!$inv){http_response_code(404);echo 'Рахунок не знайдено';return;}
-$sign=function(string $status)use($invoice,$inv){$raw=json_encode(['invoiceId'=>$invoice,'status'=>$status,'amount'=>(int)$inv['amount'],'ccy'=>980,'modifiedDate'=>gmdate('Y-m-d\TH:i:s\Z')]);openssl_sign($raw,$sig,file_get_contents('${site.dir}/preview-mono.pem'),OPENSSL_ALGO_SHA256);return ['raw'=>$raw,'sign'=>base64_encode($sig)];};
-$e=fn($v)=>htmlspecialchars(json_encode($v),ENT_QUOTES);
-header('Content-Type: text/html; charset=utf-8');header('Cache-Control: no-store');?>
-<!doctype html><html lang="uk"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Тестова оплата</title>
-<body style="font:16px/1.5 system-ui;max-width:420px;margin:40px auto;padding:0 16px">
-<h1>Тестова оплата monobank</h1><p>Це заглушка локального перегляду: гроші не списуються, банк не викликається.</p>
-<p>Сума: <b><?=number_format($inv['amount']/100,2,',',' ')?> грн</b> · статус рахунку: <?=htmlspecialchars($inv['status'])?></p>
-<button data-e="<?=$e($sign('success'))?>" style="font-size:18px;padding:10px 18px">Оплатити (тест)</button>
-<button data-e="<?=$e($sign('failure'))?>" style="font-size:18px;padding:10px 18px">Відмовитись</button>
-<script>for(const b of document.querySelectorAll('button[data-e]'))b.onclick=async()=>{const e=JSON.parse(b.dataset.e);const r=await fetch('/shop/mono-webhook.php',{method:'POST',headers:{'X-Sign':e.sign,'Content-Type':'application/json'},body:e.raw});if(!r.ok){alert('Webhook: '+r.status);return;}location.assign('/shop/payment-return.php?invoice='+encodeURIComponent(<?=json_encode($invoice)?>));};</script>`);
+// monobank: the site's own test bank page of the closed staging mode (shop/mono-mock-pay.php, stage 5.5.3) — the same page as
+// on staging; nothing is signed or sent.
 // The shop's own routes (root .htaccess), the CRM and the stand's provider stubs.
 writeFileSync(path.join(site.site,'router.php'),`<?php require '${site.dir}/provider-fixture.php';$p=(string)strtok($_SERVER['REQUEST_URI'],'?');
 if(preg_match('~^/(?:dev|tests|docs|contracts|cache|node_modules)(?:/|$)|(?:^|/)\\.~',$p)){http_response_code(403);return;}
-if(preg_match('~^/__preview-pay/(mock[0-9a-f]{20})$~D',$p,$m)){$invoice=$m[1];require '${site.dir}/preview-pay.php';return;}
-if(preg_match('~^/assets/shop-client\\.\\d+\\.js$~D',$p)&&is_file(__DIR__.$p)){header('Content-Type: text/javascript; charset=utf-8');header('Cache-Control: no-store');echo str_replace('/^https:\\\\/\\\\/(?:pay\\\\.mbnk\\\\.biz|pay\\\\.monobank\\\\.ua)\\\\//','/^(?:https:\\\\/\\\\/(?:pay\\\\.mbnk\\\\.biz|pay\\\\.monobank\\\\.ua)\\\\/|\\\\/__preview-pay\\\\/)/',file_get_contents(__DIR__.$p));return;}
 if(str_starts_with($p,'/__preview-media/')){header('Content-Type: image/svg+xml');header('Cache-Control: no-store');echo '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800"><rect width="800" height="800" fill="#3a3f2e"/><text x="400" y="410" fill="#d8d2b8" font-family="sans-serif" font-size="36" text-anchor="middle">Фото тестового каталогу</text></svg>';return;}
 // Test-catalogue photos are addressed to the live domain (https://rubizh.shop/media/…): on the stand they are local placeholders,
 // so the browser never asks the production site for anything.
-ob_start(fn($b)=>str_replace(['https://pay.mbnk.biz/mock','https:\\\\/\\\\/pay.mbnk.biz\\\\/mock','https://rubizh.shop/media/','https:\\\\/\\\\/rubizh.shop\\\\/media\\\\/'],['/__preview-pay/mock','\\\\/__preview-pay\\\\/mock','/__preview-media/','\\\\/__preview-media\\\\/'],$b));
+ob_start(fn($b)=>str_replace(['https://rubizh.shop/media/','https:\\\\/\\\\/rubizh.shop\\\\/media\\\\/'],['/__preview-media/','\\\\/__preview-media\\\\/'],$b));
 if(str_starts_with($p,'/api/')){require __DIR__.'/api/index.php';return;}
 if(str_starts_with($p,'/crm/')&&!is_file(__DIR__.$p)){require __DIR__.'/crm/index.html';return;}
 if($p==='/'||preg_match('~^/(?:(?:product|catalog|kit|categories|porady|rozdil)(?:/.*)?|offer/?|privacy/?)$~',$p)){require __DIR__.'/storefront.php';return;}
@@ -160,8 +140,16 @@ if(existsSync(chunksFile)){
  // Supplier data time moved to "6 hours ago" in memory (as the fixture does), otherwise the 5.1 freshness rule hides it.
  // The test catalogue (published by the stand) is hidden by the last chunk, so the site shows the wave only.
  const last=chunks[chunks.length-1];last.hide_ids=[...new Set([...(last.hide_ids||[]),...site.wire.products.map(m=>m.id)])];
- for(const c of chunks){freshWire(c);const r=await site.post('/api/pim/sync',c,{'Authorization':'Bearer '+PIM_KEY});if(r.status!==200){console.error('Сайт не прийняв частину хвилі '+c.chunk_index+': '+r.status+' '+JSON.stringify(r.data).slice(0,300));await stop(1);}}
- products=chunks.reduce((n,c)=>n+c.products.length,0);catalogue='перша хвиля run11: '+products+' товарів';
+ // Stage 5.5.3: the two 1 UAH test products ride in the same batch; the PIM import time is «6 hours ago» at every start, so
+ // the 72 h / 8 days freshness rule never closes payment or hides the catalogue on a later day.
+ last.products.push(...testProducts(chunks.flatMap(c=>c.products)));
+ for(const c of chunks){freshWire(c);for(const m of c.products)for(const v of m.variants)if(v.stock_imported_at!=null){v.stock_imported_at=Date.now()-6*3600000;v.stock_data_age_hours=6;}const r=await site.post('/api/pim/sync',c,{'Authorization':'Bearer '+PIM_KEY});if(r.status!==200){console.error('Сайт не прийняв частину хвилі '+c.chunk_index+': '+r.status+' '+JSON.stringify((r.data?.results||[]).filter(x=>x.status!=='valid')).slice(0,1500));await stop(1);}}
+ products=chunks.reduce((n,c)=>n+c.products.length,0);catalogue='перша хвиля run11: '+(products-2)+' товарів і 2 тестові по 1 грн';
+}else{
+ // The test catalogue of the stand: the two 1 UAH test products are added by a batch of their own.
+ const {products:_,...head}=site.wire,extra={...head,batch_id:testBatchId(),chunk_index:0,chunk_count:1,hide_ids:[],products:testProducts(site.wire.products)};
+ const r=await site.post('/api/pim/sync',extra,{'Authorization':'Bearer '+PIM_KEY});if(r.status!==200){console.error('Сайт не прийняв тестові товари: '+r.status+' '+JSON.stringify(r.data).slice(0,300));await stop(1);}
+ products=site.wire.products.length+2;catalogue='тестовий каталог і 2 тестові товари по 1 грн';
 }
 const users=roles5.map(role=>({role,email:staffEmail(role)}));
 mkdirSync(cache,{recursive:true});

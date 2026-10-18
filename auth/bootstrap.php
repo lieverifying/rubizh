@@ -15,7 +15,7 @@ header("Content-Security-Policy: default-src 'none'; style-src 'self' 'unsafe-in
 session_name('rubizh_customer');
 session_cache_limiter('');
 ini_set('session.use_strict_mode', '1');
-session_set_cookie_params(['lifetime'=>0,'path'=>'/','secure'=>true,'httponly'=>true,'samesite'=>'Lax']);
+session_set_cookie_params(['lifetime'=>0,'path'=>'/','secure'=>rubizhCookieSecure(),'httponly'=>true,'samesite'=>'Lax']);
 if(!defined('RUBIZH_AUTH_NO_SESSION')){session_start();if (empty($_SESSION['csrf'])) { $_SESSION['csrf'] = bin2hex(random_bytes(32)); }}else{$_SESSION=[];}
 if(!defined('RUBIZH_AUTH_NO_SESSION'))rubizhDeviceIdentity();
 try{rubizhPublicGate('account',600);}catch(RubizhHttpException $e){

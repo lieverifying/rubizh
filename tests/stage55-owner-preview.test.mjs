@@ -39,7 +39,9 @@ test('owner-preview: buyer path 390/1280 with the FOP invoice, card payment on t
   const net=spawnSync(s.php,[...s.php_args,'-r','echo json_encode([function_exists("curl_init"),function_exists("fsockopen"),function_exists("stream_socket_client"),ini_get("allow_url_fopen")]);'],{encoding:'utf8'});
   assert.equal(net.stdout,'[false,false,false,"0"]',net.stderr);
   // Buyer path at 390 and 1280 px through the storefront UI: home, catalogue, product, cart, checkout with the FOP invoice.
-  const slug=(await (await fetch(s.site+'/shop/catalog.php?action=storefront')).json()).products.find(p=>p.id==='m-jacket').slug;
+  const store=(await (await fetch(s.site+'/shop/catalog.php?action=storefront')).json()).products,slug=store.find(p=>p.id==='m-jacket').slug;
+  // Stage 5.5.3: the two 1 UAH test products (owner) are on the stand.
+  for(const [slug,name] of [['test-oplata-odrazu','ТЕСТ — оплата одразу'],['test-pid-zamovlennia','ТЕСТ — під замовлення']]){const r=await fetch(s.site+'/product/'+slug);assert.equal(r.status,200,slug);assert.match(await r.text(),new RegExp(name),slug);}
   for(const [width,height] of [[390,844],[1280,900]]){
    const ctx=await browser.newContext({viewport:{width,height}});ctx.on('request',r=>urls.push(r.url()));const page=await ctx.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
    await page.goto(s.site+'/');await page.locator('[data-store-surface]').waitFor();
@@ -70,10 +72,10 @@ test('owner-preview: buyer path 390/1280 with the FOP invoice, card payment on t
    return {id:o.data.order.id,pay,w};
   },[KYIV,WH,line()]);
   assert.ok(placed.id,JSON.stringify(placed));
-  assert.equal(placed.pay.status,200,JSON.stringify(placed.pay));assert.match(placed.pay.data.url,/^\/__preview-pay\/mock[0-9a-f]{20}$/,'the bank page is local');
+  assert.equal(placed.pay.status,200,JSON.stringify(placed.pay));assert.match(placed.pay.data.url,/^\/shop\/mono-mock-pay\.php\?invoice=mock[0-9a-f]{20}$/,'the bank page is the site\'s own test page (stage 5.5.3, same as the closed staging)');
   assert.equal(placed.w.status,200,JSON.stringify(placed.w));
   await page.goto(s.site+placed.pay.data.url);await page.getByRole('heading',{name:'Тестова оплата monobank'}).waitFor();
-  await page.getByRole('button',{name:'Оплатити (тест)'}).click();await page.waitForURL(/payment-return\.php|\/auth\/|\/$/);
+  await page.getByRole('button',{name:'Оплатити (тест)'}).click();await page.waitForURL(/payment-return\.php/);await page.getByText('Замовлення оплачено').waitFor();
   await ctx.close();
   // CRM: every role signs in with the printed password; OWNER sees «Швидкість сайту».
   for(const u of s.users){const c=await crm(browser,s,u.role,urls);if(u.role==='OWNER'){await c.page.goto(s.crm+'analytics');await c.page.getByRole('heading',{name:'Швидкість сайту'}).waitFor();}assert.deepEqual(c.errors,[],u.role+' JS errors');await c.close();}
