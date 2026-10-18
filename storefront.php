@@ -136,7 +136,7 @@ http_response_code($status);header('Content-Type: text/html; charset=utf-8');hea
 if($status===503)header('Retry-After: 60');
 if($status===404){echo '<!doctype html><html lang="uk"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Не знайдено — РУБІЖ</title><style>a{color:#F2A33C}</style><body style="background:#0B0D0B;color:#EDEFEA;font:18px Arial;padding:40px">'.$fallback.'</body></html>';exit;}
 $boot['settings']=shopPublicSettings();
-$html=rubizhSellerHtml(file_get_contents(__DIR__.'/index.html'));
+$html=rubizhMessengersInHtml(rubizhSellerHtml(file_get_contents(__DIR__.'/index.html')));
 // Real metadata belongs in the head, before the client runtime begins.
 if(str_contains($head,'<title>'))$html=preg_replace('~<title>.*?</title>~s','',$html,1);
 if(str_contains($head,'<meta name="description"'))$html=preg_replace('~<meta\b[^>]*\bname=["\']description["\'][^>]*>~i','',$html);
