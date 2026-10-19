@@ -11,9 +11,9 @@
 | Часть | Что | SHA-256 |
 |---|---|---|
 | Сайт | `Rubizh-launch-a34bb46.zip` — `a34bb46de1ce094f5d66bb11c96eca9a13674e43` = тег `rubizh-stage-5.5.3-verified` (CI 39135938600); `package-release.py --release=launch-a34bb46`, 437 файлов, обычный robots.txt | `39a5692801ffce8776529afc895c2ac6cd3603d13b0d3f45a9329520f335dee8` |
-| База | `rubizh-launch-db.sql.gz` — схема и миграции этапа (prepare-runtime, PIM v3, CRM), **без демо-каталога**: только `rubizh-test-pay-now` и `rubizh-test-preorder`, один OWNER CRM, без персональных данных и закупок; политика свежести закрытого режима 336 ч / 60 дн. до первой отправки PIM | `9810b76dd5354bbb45c385fcb93c695534b3e567a9137bbc40ff6a3ea6a94cd9` |
+| База | `rubizh-launch-db.sql.gz` — схема и миграции этапа (prepare-runtime, PIM v3, CRM), **без демо-каталога**: только `rubizh-test-pay-now` и `rubizh-test-preorder`, один OWNER CRM (почта владельца, по его решению), без закупок; политика свежести закрытого режима 336 ч / 60 дн. до первой отправки PIM | `c72c6ef72807fe9e06741fdb6e92750d0c1bcc99db75eec4dc05df0f024c9688` |
 | CRM | `Rubizh-crm-70b9bfe.zip` (без изменений) | `0c846185f25e4f9688ea673b3b143b112c8930cbd5ddee6ba3e5a19ccb0af756` |
-| PIM | `rubizh-pim-60fcf9e.zip` = `releases/pim-10.9.3/rubizh-pim-10.9.3-final-workflow.zip` на `pim-stage-5.5.2-verified` | `f146677e4ef3dbd6a74b8bf02ead95faa457d9e73cafde31497c72e791d4b65d` |
+| PIM | `rubizh-pim-24253ee.zip` = `releases/pim-10.9.3/rubizh-pim-10.9.3-final-workflow.zip` на `pim-stage-5.5.4-verified` (CI 39258442845, 798/798): при отборе любая отправка — только отмеченные | `0135df0a2f3e434b286375cfbc89c816c54006551bd96cacc5975033d5335f10` |
 
 Шаблон `api/config.php`: закрытый режим одним блоком из 6 строк (`environment`, `staging_gate`, `mono_mock`, `mono_mock_page`, `np_mock`,
 `np_ttn_enabled`), удаляется в день открытия; `pim_origins=['https://pim.rubizh.shop']`, `pim_v3_sync=true`, `trusted_proxies=[]` (PL-1 —
@@ -25,10 +25,7 @@
   - закрыто: без пароля 401 + noindex; ключ PIM — 200 + CORS `https://pim.rubizh.shop`; чужой ключ — 401; тестовый товар 200;
   - после открытия: 200 без noindex, robots.txt с `Sitemap:`, `sitemap.xml` 200;
   - `remove-test-products` скрыл 2 товара, карточка 404, `test_products_visible=0`.
-- **PIM `60fcf9e` на каталоге run11** (1723 READY, `pub` не задан): отмечено 20 → «Опублікувати обрані» → `pimSiteWire` = ровно эти 20, лишних 0.
-  - До «Опублікувати обрані» полная синхронизация отправила бы все READY.
-  - Новые товары следующего импорта снова READY.
-  - Поэтому в `ЗАПУСК.md`: автопубликация выключена, «Опублікувати обрані» — перед каждой отправкой.
+- **PIM `24253ee` (5.5.4, класс А):** при отборе (≥1 отмеченный товар каталога) все пути отправки (`sitePublish` → `pimSiteWire`) несут только отмеченные READY; неотмеченные, которые сайт показывает, уходят в `hide_ids`; новые товары импорта не отмечены; таймерной автопубликации в итоговой сборке нет. Тест `stage554-selection-only` (5): отбор + реальный импорт + полная синхронизация → только отмеченные. На `60fcf9e` (run11: 1723 READY, отмечено 20) отправка без «Опублікувати обрані» несла все READY — исправлено.
 - **Команда скрытия демо-каталога** для уже выложенного `staging-5.5.3` (`ЗАПУСК.md`, шаг 1, врезка) на копии дампа стейджинга:
   - 372 → 2 видимых, пользователи CRM 5 → 5;
   - повторный запуск — 0.
