@@ -59,6 +59,10 @@ function monoPublicKey(PDO $db,bool $fresh=false): string {
  try{
   $other=monoPublicKeyOtherToken($db);$key=$other?false:$db->query("SELECT v FROM meta WHERE k='mono_public_key'")->fetchColumn();
   $last=(int)$db->query("SELECT v FROM meta WHERE k='mono_public_key_checked'")->fetchColumn();
+  // A new token skips the 60 s wait once; a failing fetch for it is still limited (10 s) — no request flood to the bank.
+  if($other){$tag=monoPublicKeyTag();[$atTag,$at]=array_pad(explode('|',(string)$db->query("SELECT v FROM meta WHERE k='mono_public_key_attempt'")->fetchColumn(),2),2,'0');
+   if(hash_equals($tag,$atTag)&&(int)$at>time()-10)throw new RubizhHttpException(503,'Спробуйте пізніше.',10);
+   $db->prepare("INSERT INTO meta(k,v) VALUES('mono_public_key_attempt',?) ON DUPLICATE KEY UPDATE v=VALUES(v)")->execute([$tag.'|'.time()]);}
   if(!$other&&$last>time()-60){if(is_string($key)&&$key!=='')return $key;throw new RubizhHttpException(503,'Спробуйте пізніше.',60);}
   $db->prepare("INSERT INTO meta(k,v) VALUES('mono_public_key_checked',?) ON DUPLICATE KEY UPDATE v=VALUES(v)")->execute([(string)time()]);
   $r=monoApi('pubkey');$key=(string)($r['key']??'');
@@ -217,7 +221,7 @@ function monoWorkerRun(PDO $db): int {
  // Two queues: invoices waiting for a lost webhook keep their first-observation time and must not starve the rest.
  $rows=array_merge($db->query("SELECT * FROM rubizh_mono_invoices WHERE invoice_id IS NULL AND status IN ('creating','unknown') AND created_at<=UTC_TIMESTAMP()-INTERVAL 15 MINUTE ORDER BY created_at LIMIT 25")->fetchAll(PDO::FETCH_ASSOC),$db->query("SELECT * FROM rubizh_mono_invoices i WHERE invoice_id IS NOT NULL AND (status IN ('creating','unknown','created','processing','hold') OR refund_status IN ('processing','unknown') OR status='failure' AND NOT EXISTS (SELECT 1 FROM rubizh_np_audit a WHERE a.order_id=i.order_id AND a.action IN ('mono_invoice_removed','mono_invoice_final_not_removed') AND a.note=i.invoice_id)) ORDER BY updated_at LIMIT 25")->fetchAll(PDO::FETCH_ASSOC),
   $db->query("SELECT * FROM rubizh_mono_invoices WHERE invoice_id IS NOT NULL AND status='awaiting_webhook' AND refund_status NOT IN ('processing','unknown') ORDER BY RAND() LIMIT 10")->fetchAll(PDO::FETCH_ASSOC));$failed=0;
- foreach($rows as $i){try{monoRefresh($db,$i);}catch(Throwable $e){$failed++;}}return $failed;
+ foreach($rows as $i){try{monoRefresh($db,$i);}catch(Throwable $e){$failed++;error_log('rubizh mono-worker: invoice row '.(int)$i['id'].' order '.(int)$i['order_id'].' status check failed: '.get_class($e).': '.substr($e->getMessage(),0,160));}}return $failed;
 }
 // SITE forms/JSON use the existing updated_at version. The CRM caller already checks its stronger
 // fingerprint under this same lock; only that authenticated, already-locked call (or CLI) may omit it.

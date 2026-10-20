@@ -46,6 +46,7 @@ test('5.6-2 manual TTN: format, RBAC, paid order only, one TTN per parcel, idemp
   s.sql(`INSERT INTO meta(k,v) VALUES('np_mock_status_20450123456789','5') ON DUPLICATE KEY UPDATE v='5'`);
   order=data(await wh.send('/shipments/'+p1.id+'/refresh',{version:order.version}));
   assert.equal((await wh.send('/shipments/'+p1.id+'/cancel',{version:order.version})).status,409,'a moving parcel cannot be withdrawn');
+  assert.ok(s.sql("SELECT COUNT(*) n FROM rubizh_crm_notifications WHERE audience='role:OWNER' AND kind='manual_ttn' AND title LIKE '%20450123456789%'")[0].n==1,'the OWNER sees every hand-entered TTN');
   assert.ok(s.sql("SELECT COUNT(*) n FROM rubizh_np_audit WHERE action IN ('shipment_manual_ttn','shipment_manual_ttn_withdrawn')")[0].n>=4,'every manual TTN and withdrawal is audited');
  }finally{s.stop();}
 });

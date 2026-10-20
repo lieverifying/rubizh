@@ -9,7 +9,7 @@ declare(strict_types=1);
 function rubizhStagingSettings(): array {
     static $c=null;if($c!==null)return $c;
     $f=$GLOBALS['rubizh_config_file']??dirname(__DIR__).'/api/config.php';$all=is_file($f)?(require $f):[];
-    $c=['environment'=>is_array($all)?($all['environment']??null):null,'gate'=>is_array($all)?($all['staging_gate']??null):null];
+    $c=['environment'=>is_array($all)?($all['environment']??null):null,'gate'=>is_array($all)?($all['staging_gate']??null):null,'mono_mock'=>is_array($all)?($all['mono_mock']??null):null];
     return $c;
 }
 // Stage 5.5 review: lowercase, no port, no trailing dot; anything that is not a local name is treated as public.
@@ -52,8 +52,9 @@ function rubizhStagingKeyRequest(): bool {
 // Stage 5.6-3 (D-84): the bank calls the webhook without the password. Only POST to the exact path, without a query,
 // dot segments or encoded characters, and with a signature header; shop/mono-webhook.php verifies the signature itself.
 function rubizhStagingBankWebhook(): bool {
-    $uri=(string)($_SERVER['REQUEST_URI']??'');
-    return ($_SERVER['REQUEST_METHOD']??'')==='POST'&&$uri==='/shop/mono-webhook.php'&&($_SERVER['SCRIPT_NAME']??'')==='/shop/mono-webhook.php'&&trim((string)($_SERVER['HTTP_X_SIGN']??''))!=='';
+    // With the stand's mock bank (mono_mock) nothing outside calls the webhook — it stays behind the password.
+    $uri=(string)($_SERVER['REQUEST_URI']??'');$c=rubizhStagingSettings();
+    return ($c['mono_mock']??null)!==true&&($_SERVER['REQUEST_METHOD']??'')==='POST'&&$uri==='/shop/mono-webhook.php'&&($_SERVER['SCRIPT_NAME']??'')==='/shop/mono-webhook.php'&&trim((string)($_SERVER['HTTP_X_SIGN']??''))!=='';
 }
 function rubizhStagingGate(): void {
     if(PHP_SAPI==='cli'||!empty($GLOBALS['rubizh_staging_gate_passed']))return;

@@ -40,7 +40,7 @@ test('5.6-1 policy: HTTPS only, listed supplier domains only, no credentials, po
 
 test('5.6-1 policy: internal and private addresses are refused after DNS, on every hop (DNS rebinding), and the connection is pinned',{skip},()=>{
  const v=evalPhp(`$o=[];$u='https://tactic-shop.in.ua/content/export/k.xml';
-  foreach([['127.0.0.1'],['10.0.0.5'],['192.168.1.1'],['169.254.169.254'],['::1'],['::ffff:10.0.0.1'],['fd00::1'],['93.184.216.34','10.0.0.5'],[]] as $i=>$ips)$o['dns'.$i]=attempt($u,['tactic-shop.in.ua'=>$ips],[[200,[],'x']]);
+  foreach([['127.0.0.1'],['10.0.0.5'],['192.168.1.1'],['169.254.169.254'],['::1'],['::ffff:10.0.0.1'],['fd00::1'],['93.184.216.34','10.0.0.5'],[],['64:ff9b::7f00:1'],['2002:7f00:1::']] as $i=>$ips)$o['dns'.$i]=attempt($u,['tactic-shop.in.ua'=>$ips],[[200,[],'x']]);
   $o['calls_after_private']=count($GLOBALS['calls']);
   // An IP-literal host that the owner listed by mistake is still checked as an address.
   $o['literal']=attempt('https://127.0.0.1/feed.xml',[],[[200,[],'x']],['hosts'=>['127.0.0.1']]);
@@ -48,7 +48,7 @@ test('5.6-1 policy: internal and private addresses are refused after DNS, on eve
   $o['rebind']=attempt($u,['tactic-shop.in.ua'=>[['93.184.216.34'],['127.0.0.1']]],[[302,['location'=>'/content/export/k2.xml'],''],[200,[],'x']]);
   $o['rebind_calls']=count($GLOBALS['calls'])-$o['calls_after_private'];
   $GLOBALS['calls']=[];$o['pinned']=attempt($u,['tactic-shop.in.ua'=>['93.184.216.34','2606:2800:220:1::1']],[[200,[],'<yml_catalog/>']]);$o['pin']=$GLOBALS['calls'][0];echo json_encode($o);`);
- for(let i=0;i<8;i++){assert.equal(v['dns'+i].ok,false,'dns'+i);assert.equal(v['dns'+i].reason,'ADDRESS_FORBIDDEN','dns'+i);}
+ for(const i of [0,1,2,3,4,5,6,7,9,10]){assert.equal(v['dns'+i].ok,false,'dns'+i);assert.equal(v['dns'+i].reason,'ADDRESS_FORBIDDEN','dns'+i+' (9, 10: NAT64 / 6to4 with an IPv4 inside)');}
  assert.equal(v.dns8.reason,'UNRESOLVED');
  assert.equal(v.calls_after_private,0,'no connection to a private address');
  assert.equal(v.literal.reason,'ADDRESS_FORBIDDEN');
@@ -71,7 +71,7 @@ test('5.6-1 policy: redirects stay on the same domain and HTTPS; size and status
   $o['empty']=attempt($u,$d,[[200,[],'']]);
   $o['timeout']=attempt($u,$d,[[0,['timeout'=>true],'']]);
   $o['network']=attempt($u,$d,[[0,['error'=>'Could not resolve'],'']]);
-  $o['log']=[supplierFetchLogUrl($u),supplierFetchLogUrl('https://user:pw@www.armoline.com.ua/content/export/a.xml#frag'),supplierFetchLogUrl('not a url ?publicKey=SECRETKEY123'),supplierFetchLogUrl('https://tactic-shop.in.ua/content/export/0123456789abcdef0123456789abcdef.xml')];echo json_encode($o);`);
+  $o['log']=[supplierFetchLogUrl($u),supplierFetchLogUrl('https://user:pw@www.armoline.com.ua/content/export/a.xml#frag'),supplierFetchLogUrl('not a url ?publicKey=SECRETKEY123'),supplierFetchLogUrl('https://tactic-shop.in.ua/content/export/0123456789abcdef0123456789abcdef.xml'),supplierFetchLogUrl("https://evil.example/a\nrubizh fake line"),strlen(supplierFetchLogUrl('https://evil.example/'.str_repeat('a/',3000)))];echo json_encode($o);`);
  for(const k of ['foreign','parent','other_supplier','http']){assert.equal(v[k].ok,false,k);assert.equal(v[k].reason,'REDIRECT_FORBIDDEN',k);}
  assert.equal(v.same.ok,true);assert.match(v.same.body,/yml_catalog/);
  assert.equal(v.www.ok,true,'apex → www of the same listed domain');
@@ -83,7 +83,7 @@ test('5.6-1 policy: redirects stay on the same domain and HTTPS; size and status
  assert.equal(v.timeout.reason,'TIMEOUT');assert.equal(v.timeout.status,504);
  assert.equal(v.network.reason,'UPSTREAM_UNREACHABLE');assert.equal(v.network.status,502);
  // Армолайн and Киборг put the export key in the path: long token segments are masked too.
- assert.deepEqual(v.log,['https://tacticalbelt.salesdrive.me/export/abc/export.yml','https://www.armoline.com.ua/content/export/a.xml','(невірна адреса)','https://tactic-shop.in.ua/content/export/0123…xml']);
+ assert.deepEqual(v.log,['https://tacticalbelt.salesdrive.me/export/abc/export.yml','https://www.armoline.com.ua/content/export/a.xml','(невірна адреса)','https://tactic-shop.in.ua/content/export/0123…xml','https://evil.example/a_rubizh?fake?line',300],'no line breaks or unbounded text in the log');
 });
 
 test('5.6-1 curl transport: streams to disk, stops over the limit (body and Content-Length), honours the deadline, never follows redirects itself',{skip,timeout:120000},async()=>{

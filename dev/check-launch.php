@@ -23,7 +23,7 @@ function launchSmtpAuth(string $password): string {
  }catch(Throwable $e){return 'failed';}finally{if(is_resource($socket))fclose($socket);}
 }
 $root=dirname(__DIR__);$private=dirname($root).'/rubizh-automation';$report=['smtp_auth'=>in_array('--smtp',$argv,true)?launchSmtpAuth((string)(authConfig()['noreply_password']??'')):'not_checked','inbox_delivery'=>'real_checkout_test_required','workers'=>[],'mail_queues'=>[]];$failed=false;
-foreach(['cache'=>180,'notifications'=>300,'payments'=>600,'delivery'=>1800,'photos'=>900] as $name=>$maxAge){
+foreach(['cache'=>180,'notifications'=>300,'payments'=>600,'delivery'=>1800,'photos'=>900,'crm'=>300] as $name=>$maxAge){
  $raw=is_file($private.'/'.$name.'.state')?trim((string)file_get_contents($private.'/'.$name.'.state')):'';$values=explode(' ',$raw);
  $valid=count($values)===3&&preg_match('/^\d+$/D',$values[0])&&preg_match('/^-?\d+$/D',$values[1])&&preg_match('/^\d+$/D',$values[2]);$success=$valid?(int)$values[2]:0;$age=$success?max(0,time()-$success):null;
  $state=!$valid?'not_seen':((int)$values[1]>0?'failed':($age!==null&&$age<=$maxAge?'verified':((int)$values[1]===-1&&time()-(int)$values[0]<300?'running':'stale')));

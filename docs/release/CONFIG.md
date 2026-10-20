@@ -623,3 +623,11 @@ CRM работает на `/crm/` того же домена; Staff API — `/ap
 - **Видно владельцу:** `GET /api/pim/status` (по ключу PIM) — `freshness_policy`, `capabilities.freshness_policy_version=1`, `products.hidden_stale_supplier_data`. PIM публикует только на сайт с `freshness_policy_version=1`.
 - **Заказы:** оплаченные и уже созданные заказы правило не меняет; заказ с позицией из «правила 2» создаётся в `WAITING_CONFIRMATION` (`contact.confirmation_reason=STALE_SUPPLIER_DATA`) и виден в CRM в «Очікують підтвердження».
 
+
+## 18. Загрузка выгрузок поставщиков через сайт (этап 5.6-1, D-82)
+
+| Ключ | Тип | По умолчанию | Значение |
+|---|---|---|---|
+| `supplier_fetch_hosts` | list | `[]` | дополнительные домены поставщиков для `POST /api/pim/supplier-fetch` (к встроенным `armoline.com.ua`, `tactic-shop.in.ua`, `tacticalbelt.salesdrive.me`; домен разрешён вместе с `www.`). Только имена хостов: IP, `*` и прочее не принимаются как домен |
+
+Ограничения (код, не настройки): HTTPS, порт 443, публичные адреса после DNS (закреплены на соединение), редирект только в пределах того же домена, 100 МБ, 120 с, 30 запросов в час на сеть, 2 одновременно. Лимиты PHP веб-сервера видны в `GET /api/pim/status` → `php_limits`. Исходящий HTTPS к поставщикам: `php dev/check-launch.php --net`.

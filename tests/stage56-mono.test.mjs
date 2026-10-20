@@ -23,6 +23,9 @@ test('5.6-3 webhook key: fetched from the bank by the token, bound to it; a new 
    $o=[];putenv('RUBIZH_MONO_TOKEN=sandbox-token');$o[]=monoPublicKey($db)==='${a}';$o[]=monoPublicKey($db)==='${a}';$o[]=count($calls);
    putenv('RUBIZH_MONO_TOKEN=prod-token');$o[]=monoPublicKey($db)==='${b}';$o[]=count($calls);
    $o[]=monoPublicKey($db,true)==='${b}';$o[]=count($calls);$o[]=array_column($calls,0);
+   // A third token whose fetch fails: one immediate attempt, the next within 10 s is refused without a request.
+   putenv('RUBIZH_MONO_TOKEN=broken-token');$GLOBALS['mono_test_transport']=function($path)use(&$calls){$calls[]=[$path,'broken'];throw new RuntimeException('bank down');};
+   $f=[];for($k=0;$k<3;$k++){try{monoPublicKey($db);$f[]='ok';}catch(Throwable $e){$f[]=get_class($e);}}$o[]=[$f,count($calls)];putenv('RUBIZH_MONO_TOKEN=prod-token');
    // A key stored before the binding (no token tag) is still used as before — refetched only when a signature fails.
    $db->exec("DELETE FROM meta WHERE k IN ('mono_public_key_token','mono_public_key_checked')");$o[]=monoPublicKey($db)==='${b}';$o[]=count($calls);
    $o[]=[monoMinor(1),monoMinor('1'),monoMinor('1499.99'),monoMinor(0.01)];
@@ -31,14 +34,16 @@ test('5.6-3 webhook key: fetched from the bank by the token, bound to it; a new 
   assert.deepEqual(out.slice(3,5),[true,2],'the production token gets its own key at once (no 60 s wait)');
   assert.deepEqual(out.slice(5,7),[true,2],'a forced refresh within 60 s is throttled (no request flood)');
   assert.deepEqual(out[7],['pubkey','pubkey'],'GET /api/merchant/pubkey');
-  assert.deepEqual(out.slice(8,10),[true,2],'legacy key without a tag: no extra request');
-  assert.deepEqual(out[10],[100,100,149999,1],'kopecks: 1 UAH = 100');
+  assert.deepEqual(out[8],[['RuntimeException','RubizhHttpException','RubizhHttpException'],3],'a failing new token: one request, then throttled');
+  assert.deepEqual(out.slice(9,11),[true,3],'legacy key without a tag: no extra request');
+  assert.deepEqual(out[11],[100,100,149999,1],'kopecks: 1 UAH = 100');
  }finally{s.stop();}
 });
 
 test('5.6-3 closed mode: the monobank webhook passes the password gate (POST, exact path), its signature is still checked',{skip,timeout:180000},async()=>{
  const hash=php(`echo password_hash(${JSON.stringify(PASSWORD)},PASSWORD_DEFAULT);`).stdout.trim();
- const s=await startSite({enableV3:false,extraConfig:`,'environment'=>'staging','mono_mock'=>true,'staging_gate'=>['user'=>'${USER}','password_hash'=>'${hash}']`});
+ // The real bank behind the closed mode (D-84 live payment): mono_mock off. With the stand's mock bank the path stays closed.
+ const s=await startSite({enableV3:false,extraConfig:`,'environment'=>'staging','mono_mock'=>false,'staging_gate'=>['user'=>'${USER}','password_hash'=>'${hash}']`});
  try{
   const {publicKey,privateKey}=generateKeyPairSync('ec',{namedCurve:'prime256v1'});
   s.sql(`INSERT INTO meta(k,v) VALUES('mono_public_key','${pem(publicKey)}'),('mono_public_key_checked',UNIX_TIMESTAMP()) ON DUPLICATE KEY UPDATE v=VALUES(v)`);
@@ -55,6 +60,8 @@ test('5.6-3 closed mode: the monobank webhook passes the password gate (POST, ex
   assert.equal((await request(s.base,'/shop/mono-webhook.php')).status,401,'GET is not the bank');
   for(const p of ['/shop/mono-webhook.php/../customer.php','/shop/%2e%2e/shop/customer.php','/shop/mono-webhook.php?x=/../','/shop/mono-mock-pay.php','/shop/payment-return.php','/shop/customer.php'])
    assert.equal((await post(p,raw,{'X-Sign':sign(raw)})).status,401,p);
+  const {readFileSync,writeFileSync}=await import('node:fs');const cfg=s.site+'/api/config.php';writeFileSync(cfg,readFileSync(cfg,'utf8').replace("'mono_mock'=>false","'mono_mock'=>true"));
+  assert.equal((await post('/shop/mono-webhook.php',raw,{'X-Sign':sign(raw)})).status,401,'with the mock bank nothing outside calls the webhook');
  }finally{s.stop();}
 });
 

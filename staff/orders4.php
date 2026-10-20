@@ -253,7 +253,7 @@ function crmShipment4(PDO $db,array $actor,int $id,array $b,string $action): arr
  if($action==='create')crmFeatureRequire('np_ttn');
  if(in_array($action,['refresh','reconcile'],true))crmFeatureRequire('np_tracking');
  // 5.6-2: a manually entered TTN has no NP document of ours to delete — «cancel» withdraws the number instead.
- $manual=$action==='cancel'&&(json_decode((string)(crmOne($db,'SELECT origin_json FROM rubizh_order_shipments WHERE id=?',[$id])['origin_json']??''),true)['source']??'')==='manual';
+ $manual=$action==='cancel'&&(json_decode((string)($s['origin_json']??''),true)['source']??'')==='manual';
  if($action==='cancel'&&$s['status']==='created'&&!$manual){crmFeatureRequire('np_ttn');return crmShipmentDomain($db,$actor,$id,$b,'shipment.delete_ttn',fn($s)=>npDeleteTtn($db,(int)$s['order_id'],$id,$actor['id']),true);}
  return crmOrderCardExtras($db,crmShipmentAction($db,(int)$s['order_id'],$actor,['version'=>$b['expected_version']]+$b,$action,$id),$actor);
 }

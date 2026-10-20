@@ -101,11 +101,11 @@ test('E2E 13: «Внести ТТН вручну» → format check in the dialo
   const [l]=linesBySupplier(s);const b=await buyer(s,'+380671230013');await b.login();
   const o=await b.checkout([l]);const m=await staff(s,'MANAGER');
   await m.order(o.id);await m.act('Взяти в роботу');await b.pay(o.id);await m.order(o.id);
-  // A wrong number is explained in the dialog and refused by the server; nothing is saved.
+  // A wrong number is explained in the dialog and cannot be sent (the server refuses it too: stage56-manual-ttn); nothing is saved.
   await m.page.locator('.actions-bar').getByRole('button',{name:'Внести ТТН вручну',exact:true}).click();
-  let d=m.page.getByRole('dialog');await d.getByLabel(/Номер ТТН/).fill('12345');
-  await assertText(d.getByRole('alert'),/14 цифр/);await d.getByLabel(/Фактичну наявність/).check();await d.locator('.dialog-actions button').last().click();
-  await assertText(d,/14 цифр/);assert.equal(s.sql('SELECT COUNT(*) n FROM rubizh_order_shipments WHERE order_id='+o.id)[0].n,0);
+  let d=m.page.getByRole('dialog');await d.getByLabel(/Номер ТТН/).fill('12345');await d.getByLabel(/Фактичну наявність/).check();
+  await assertText(d,/14 цифр, наприклад/);assert.equal(await d.locator('.dialog-actions button').last().isDisabled(),true,'no request with a wrong number');
+  assert.equal(s.sql('SELECT COUNT(*) n FROM rubizh_order_shipments WHERE order_id='+o.id)[0].n,0);
   await d.getByLabel(/Номер ТТН/).fill('2045 0123 4567 13');await d.locator('.dialog-actions button').last().click();await d.waitFor({state:'detached',timeout:20000});await m.page.waitForLoadState('networkidle');
   assert.match(await m.text(),/20450123456713/);assert.equal(s.one('SELECT tracking_number t FROM rubizh_order_shipments WHERE order_id='+o.id).t,'20450123456713');
   s.sql("INSERT INTO meta(k,v) VALUES('np_mock_status_20450123456713','9') ON DUPLICATE KEY UPDATE v='9'");

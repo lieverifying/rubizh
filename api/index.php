@@ -97,6 +97,7 @@ if ($isPim) {
     @set_time_limit(180);rubizhHttpWork('supplier-fetch',2);
     try{supplierFetchRespond($in);exit;}
     catch(SupplierFetchRejected $e){out(['ok'=>false,'error'=>$e->getMessage(),'error_code'=>$e->reason],$e->getCode());}
+    catch(Throwable $e){error_log('rubizh supplier-fetch: failed '.get_class($e).': '.substr($e->getMessage(),0,200));out(['ok'=>false,'error'=>'Сайт не зміг завантажити прайс (внутрішня помилка, деталі в журналі сайту).','error_code'=>'SITE_ERROR'],500);}
   }
   if ($path === '/pim/photos' && $method === 'POST') {
     @set_time_limit(60);

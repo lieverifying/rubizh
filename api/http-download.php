@@ -6,6 +6,8 @@ function rubizhPublicIp(string $ip): bool {
     if($packed===false)return false;
     if(strlen($packed)===4&&ord($packed[0])>=224)return false;
     if(strlen($packed)===16&&ord($packed[0])===255)return false;
+    // Stage 5.6 review: NAT64 (64:ff9b::/96, 64:ff9b:1::/48) and 6to4 (2002::/16) carry an IPv4 inside — never public here.
+    if(strlen($packed)===16&&(str_starts_with($packed,"\x00\x64\xff\x9b")||str_starts_with($packed,"\x20\x02")))return false;
     return filter_var($ip,FILTER_VALIDATE_IP,FILTER_FLAG_GLOBAL_RANGE)!==false;
 }
 function rubizhDownloadTarget(string $url): array {

@@ -43,7 +43,7 @@ function crmIdempotencyKey(array $route,array $body): ?string {
  if(empty($route['idempotent']))return null;
  // Money and creation routes always need the per-attempt key (M-11); elsewhere a key is honoured when the client sends
  // one (the CRM frontend always does) and the order version alone protects legacy clients.
- $required=in_array($route['id'],['orders.create','payments.refund','orders.invoice.accept','orders.reconcile.not_created','orders.reconcile.manual','staff.invite','staff.reset','orders.shipment.draft','returns.create','wholesale.order'],true);
+ $required=in_array($route['id'],['orders.create','payments.refund','orders.invoice.accept','orders.reconcile.not_created','orders.reconcile.manual','staff.invite','staff.reset','orders.shipment.draft','orders.shipment.manual','returns.create','wholesale.order'],true);
  if($key===null&&!$required)return null;
  if(!is_string($key)||!preg_match('/^[a-f0-9]{32}$/D',$key))throw new CrmError('IDEMPOTENCY_KEY_REQUIRED',400);
  return $key;

@@ -36,7 +36,9 @@ function crmWorkerRun(PDO $db): array {
   foreach(crmQuery($db,"SELECT id,title,assignee_id FROM rubizh_crm_tasks WHERE state IN ('OPEN','IN_PROGRESS') AND due_at<UTC_TIMESTAMP() AND assignee_id IS NOT NULL AND due_at>UTC_TIMESTAMP()-INTERVAL 7 DAY") as $t)crmNotify($db,'staff:'.$t['assignee_id'],'task_overdue','task',(string)$t['id'],'Прострочене завдання: '.mb_substr($t['title'],0,120),false,'overdue:'.$t['id']);
   $done[]='notifications';
   // Stalled queues: shipments not tracked for 6 h or bank attempts unresolved for 6 h → critical OWNER alert once a day.
-  $stalled=(int)crmOne($db,"SELECT COUNT(*) n FROM rubizh_order_shipments WHERE tracking_number IS NOT NULL AND status IN ('created','sent') AND COALESCE(checked_at,created_at)<UTC_TIMESTAMP()-INTERVAL 6 HOUR")['n']+(int)crmOne($db,"SELECT COUNT(*) n FROM rubizh_mono_invoices WHERE status IN ('creating','unknown') AND created_at<UTC_TIMESTAMP()-INTERVAL 6 HOUR")['n'];
+  $stalled=(int)crmOne($db,"SELECT COUNT(*) n FROM rubizh_order_shipments WHERE tracking_number IS NOT NULL AND status IN ('created','sent') AND COALESCE(checked_at,created_at)<UTC_TIMESTAMP()-INTERVAL 6 HOUR")['n']+(int)crmOne($db,"SELECT COUNT(*) n FROM rubizh_mono_invoices WHERE status IN ('creating','unknown') AND created_at<UTC_TIMESTAMP()-INTERVAL 6 HOUR")['n']
+   // 5.6 review: a bank status check that keeps failing leaves invoices in created/processing/hold/awaiting_webhook or a refund in processing.
+   +(int)crmOne($db,"SELECT COUNT(*) n FROM rubizh_mono_invoices WHERE invoice_id IS NOT NULL AND (status IN ('created','processing','hold','awaiting_webhook') OR refund_status IN ('processing','unknown')) AND updated_at<UTC_TIMESTAMP()-INTERVAL 6 HOUR")['n'];
   if($stalled>0)crmNotify($db,'role:OWNER','worker_alert','system','queues','Черги оплат або доставки не оновлюються: '.$stalled,true,'stalled:'.gmdate('Ymd'));
   // Critical e-mail to OWNER (CRM_EMAIL_LIVE; mock outbox on staging; off → shown in CRM only).
   $owners=crmQuery($db,"SELECT email FROM rubizh_staff_users WHERE role='OWNER' AND enabled=1");

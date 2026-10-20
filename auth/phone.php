@@ -46,7 +46,7 @@ function turboSmsFailureNote(array $response, string $phone): string {
     foreach (is_array($response['response_result']??null)?$response['response_result']:[] as $item) {
         if (is_array($item) && (string)($item['phone']??'')===ltrim($phone,'+')) { $note.='; recipient '.$clean($item['response_code']??'').' '.$clean($item['response_status']??''); }
     }
-    return str_replace(ltrim($phone,'+'),'',trim($note));
+    return (string)preg_replace('/\d{6,}/','#',str_replace(ltrim($phone,'+'),'',trim($note)));
 }
 function sendPhoneCode(string $phone, string $code, string $id): void {
     // Automated tests only: a test transport replaces the provider (the constant is never defined by the site).

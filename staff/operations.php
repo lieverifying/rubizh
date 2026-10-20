@@ -59,14 +59,16 @@ function crmConfirmPacking(PDO $db,int $order,array $actor,array $b): void {
 }
 /** Stage 5.6-2 (D-83): «Внести ТТН вручну» — a TTN created outside CRM (another NP cabinet), entered by staff. */
 function crmManualTtn(PDO $db,int $order,array $actor,array $b,array $old): array {
- try{$number=npTrackingNumber((string)($b['tracking_number']??''));}catch(InvalidArgumentException $e){throw new CrmError('TTN_FORMAT_INVALID',422);}
+ try{$number=npTrackingNumber(is_string($b['tracking_number']??null)?$b['tracking_number']:'');}catch(InvalidArgumentException $e){throw new CrmError('TTN_FORMAT_INVALID',422);}
  $existing=crmOne($db,'SELECT * FROM rubizh_order_shipments WHERE operation_key=?',[$b['request_id']??'']);
  if($existing){if((int)$existing['order_id']!==$order||$existing['tracking_number']!==$number)throw new CrmError('IDEMPOTENCY_CONFLICT',409);return crmOrder($db,$order,$actor);}
  if(!in_array($old['payment_status'],['PAID','PARTIALLY_REFUNDED'],true))throw new CrmError('PAID_ORDER_REQUIRED',409);
  crmCheckVersion($old,$b);
  $id=crmTransaction($db,function()use($db,$order,$actor,$b,$number){crmConfirmPacking($db,$order,$actor,$b);
   try{return npManualShipment($db,$order,$actor['id'],crmRequestId($b['request_id']??null),is_array($b['lines']??null)?$b['lines']:[],$number);}catch(NpTrackingNumberUsed $e){throw new CrmError('TTN_ALREADY_USED',409);}});
- $new=crmOrder($db,$order);crmAudit($db,$actor,'order',(string)$order,'shipment.manual_ttn',['version'=>$old['version']],['version'=>$new['version'],'shipment_id'=>$id,'tracking_number'=>$number]);return $new;
+ $new=crmOrder($db,$order);crmAudit($db,$actor,'order',(string)$order,'shipment.manual_ttn',['version'=>$old['version']],['version'=>$new['version'],'shipment_id'=>$id,'tracking_number'=>$number]);
+ // 5.6 review: every hand-entered TTN is shown to the OWNER (it decides delivery and completion of a paid order).
+ crmNotify($db,'role:OWNER','manual_ttn','order',(string)$order,'ТТН внесено вручну: '.$number.' · '.($new['number']??('№'.$order)).' · '.mb_substr((string)($actor['name']??$actor['role']),0,60),false,'manual-ttn:'.$id);return $new;
 }
 
 /** Allocate rounding remainder to the final physical quantity, in integer minor units. */
