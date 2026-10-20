@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<yml_catalog date="2026-10-20 09:00">
+ <shop>
+  <name>Синтетичний постачальник</name>
+  <currencies><currency id="UAH" rate="1"/></currencies>
+  <categories><category id="1">Підсумки</category></categories>
+  <offers>
+   <offer id="SYN-1" available="true"><name>Синтетичний підсумок для тесту, олива</name><vendorCode>SYN-1</vendorCode><price>450</price><currencyId>UAH</currencyId><categoryId>1</categoryId><param name="Колір">Олива</param><quantity_in_stock>4</quantity_in_stock></offer>
+   <offer id="SYN-2" available="false"><name>Синтетичний підсумок для тесту, чорний</name><vendorCode>SYN-2</vendorCode><price>450</price><currencyId>UAH</currencyId><categoryId>1</categoryId><param name="Колір">Чорний</param><quantity_in_stock>0</quantity_in_stock></offer>
+  </offers>
+ </shop>
+</yml_catalog>

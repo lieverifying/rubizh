@@ -1,6 +1,6 @@
 <?php
 // РУБІЖ · API магазина
-//   PIM (по ключу):  POST /api/pim/sync · POST /api/pim/photos · POST /api/pim/costs · POST /api/pim/backup · GET /api/pim/backups[/{id}] · GET /api/pim/status
+//   PIM (по ключу):  POST /api/pim/sync · POST /api/pim/supplier-fetch · POST /api/pim/photos · POST /api/pim/costs · POST /api/pim/backup · GET /api/pim/backups[/{id}] · GET /api/pim/status
 //   Сайт (открыто):  GET /api/categories · GET /api/catalog · GET /api/product/{slug} · GET /api/health
 //   Планировщик:     GET /api/cron/photos?key=...
 declare(strict_types=1);
@@ -86,6 +86,18 @@ if ($isPim) {
   if($path==='/pim/backup'&&$method==='POST'){@set_time_limit(120);require_once __DIR__.'/pim-private.php';try{out(pimBackupStore());}catch(PimPrivateRejected $e){header('Cache-Control: no-store');out(['ok'=>false,'error'=>'PIM backup: '.$e->getMessage(),'error_code'=>$e->getMessage()],$e->getCode()?:422);}}
   if($path==='/pim/backups'&&$method==='GET'){require_once __DIR__.'/pim-private.php';header('Cache-Control: no-store');out(pimBackupList());}
   if(preg_match('~^/pim/backups/([^/]+)$~',$path,$bm)&&$method==='GET'){require_once __DIR__.'/pim-private.php';pimBackupSend($bm[1]);}
+  // 5.6-1 (D-82): supplier exports without CORS (Армолайн, Киборг) — SITE downloads them for PIM (api/supplier-fetch.php).
+  if($path==='/pim/supplier-fetch'){
+    if($method!=='POST')fail(405,'Тільки POST');
+    require_once __DIR__.'/supplier-fetch.php';header('Cache-Control: no-store');
+    if(!rubizhRateAllow('pim-supplier-fetch',rubizhNetworkIdentity(),30,3600)){error_log('rubizh supplier-fetch: refused RATE_LIMIT');header('Retry-After: 3600');out(['ok'=>false,'error'=>'Забагато завантажень прайсів за годину. Спробуйте пізніше.','error_code'=>'RATE_LIMIT'],429);}
+    if((int)($_SERVER['CONTENT_LENGTH']??0)>8192)fail(413,'Запит завеликий');
+    $in=json_decode((string)file_get_contents('php://input',false,null,0,8193),true,4);
+    if(!is_array($in))out(['ok'=>false,'error'=>'Тіло запиту не JSON','error_code'=>'URL_INVALID'],400);
+    @set_time_limit(180);rubizhHttpWork('supplier-fetch',2);
+    try{supplierFetchRespond($in);exit;}
+    catch(SupplierFetchRejected $e){out(['ok'=>false,'error'=>$e->getMessage(),'error_code'=>$e->reason],$e->getCode());}
+  }
   if ($path === '/pim/photos' && $method === 'POST') {
     @set_time_limit(60);
     $b = json_decode(file_get_contents('php://input') ?: '{}', true) ?: [];
@@ -97,6 +109,8 @@ if ($isPim) {
     require_once __DIR__.'/../shop/pim-v3-sync.php';
     out(['ok' => true, 'api_version' => API_VERSION, 'capabilities'=>pimV3Capabilities($pdo),'key_slot'=>$GLOBALS['rubizh_pim_key_slot'],'key_rotation'=>$GLOBALS['rubizh_pim_key_rotation'],'private_costs_version'=>1,
       'freshness_policy'=>shopFreshnessPolicy($pdo),
+      // 5.6-4в: limits of the web PHP that receives the publication and the supplier downloads (ЗАПУСК.md checks them).
+      'php_limits'=>['post_max_size'=>ini_get('post_max_size'),'upload_max_filesize'=>ini_get('upload_max_filesize'),'memory_limit'=>ini_get('memory_limit'),'max_execution_time'=>ini_get('max_execution_time'),'curl'=>function_exists('curl_init'),'sync_chunk_max_mb'=>8,'supplier_fetch_max_mb'=>100],
       'products' => ['visible' => (int)$q("SELECT COUNT(*) FROM products WHERE visible=1"), 'hidden' => (int)$q("SELECT COUNT(*) FROM products WHERE visible=0"),'hidden_stale_supplier_data'=>!empty($GLOBALS['rubizh_pim_v3_columns'])?(int)$q("SELECT COUNT(*) FROM products WHERE pim_publication_reason='".SHOP_FRESHNESS_HIDE_REASON."'"):0],
       'variants' => (int)$q("SELECT COUNT(*) FROM variants v JOIN products p ON p.id=v.product_id WHERE p.visible=1"),
       'categories' => (int)$q("SELECT COUNT(*) FROM categories WHERE product_count>0"),

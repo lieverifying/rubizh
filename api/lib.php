@@ -137,6 +137,7 @@ function cors(bool $pim): void {
     if ($origin && (in_array($origin, $allowed, true) || in_array('*', $allowed, true))) header('Access-Control-Allow-Origin: ' . $origin);
     header('Access-Control-Allow-Headers: Authorization, Content-Type, X-Backup-Sha256, X-Backup-Label');
     header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+    header('Access-Control-Expose-Headers: X-Supplier-Content-Type, X-Supplier-Last-Modified');
     header('Vary: Origin');
   } else {
     header('Access-Control-Allow-Origin: *');
