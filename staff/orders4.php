@@ -39,6 +39,7 @@ function crmHandle(PDO $db,?array $actor,array $route,array $p,array $b,array $q
   'orders.delivery'=>crmMutate($db,$actor,$id,$b,'order.delivery_update',fn()=>shopUpdateDelivery($db,$id,$actor['id'],$b['delivery'],$b['recipient']??null,$b['phone']??null,$b['reason']),true,$b['reason']),
   'orders.note'=>crmNote($db,$actor,'order',(string)$id,$b+['request_id'=>$key]),
   'orders.shipment.draft'=>crmOrderCardExtras($db,crmShipmentAction($db,$id,$actor,['version'=>$b['expected_version'],'request_id'=>$key]+$b,'draft'),$actor), // S4-01: the full card
+  'orders.shipment.manual'=>crmOrderCardExtras($db,crmShipmentAction($db,$id,$actor,['version'=>$b['expected_version'],'request_id'=>$key]+$b,'manual'),$actor), // 5.6-2 (D-83)
   'orders.invoice.accept'=>crmMutate($db,$actor,$id,$b,'payment.invoice.accept',fn()=>shopAcceptInvoicePayment($db,$id,$actor['id'],$b['amount_minor'],$b['paid_on'],$b['document'],$b['reason']),false,$b['reason']),
   'orders.reconcile.not_created'=>crmMutate($db,$actor,$id,$b,'payment.reconcile_not_created',fn()=>monoReconcileNotCreated($db,$id,$actor['id'],$b['reason']),false,$b['reason']),
   'orders.reconcile.manual'=>crmMutate($db,$actor,$id,$b,'payment.manual_reconcile',fn()=>monoReconcile($db,$id,$b['invoice_id'],$actor['id'],$b['reason']),false,$b['reason']),
@@ -251,7 +252,9 @@ function crmShipment4(PDO $db,array $actor,int $id,array $b,string $action): arr
  $s=crmShipmentRow($db,$id);
  if($action==='create')crmFeatureRequire('np_ttn');
  if(in_array($action,['refresh','reconcile'],true))crmFeatureRequire('np_tracking');
- if($action==='cancel'&&$s['status']==='created'){crmFeatureRequire('np_ttn');return crmShipmentDomain($db,$actor,$id,$b,'shipment.delete_ttn',fn($s)=>npDeleteTtn($db,(int)$s['order_id'],$id,$actor['id']),true);}
+ // 5.6-2: a manually entered TTN has no NP document of ours to delete — «cancel» withdraws the number instead.
+ $manual=$action==='cancel'&&(json_decode((string)(crmOne($db,'SELECT origin_json FROM rubizh_order_shipments WHERE id=?',[$id])['origin_json']??''),true)['source']??'')==='manual';
+ if($action==='cancel'&&$s['status']==='created'&&!$manual){crmFeatureRequire('np_ttn');return crmShipmentDomain($db,$actor,$id,$b,'shipment.delete_ttn',fn($s)=>npDeleteTtn($db,(int)$s['order_id'],$id,$actor['id']),true);}
  return crmOrderCardExtras($db,crmShipmentAction($db,(int)$s['order_id'],$actor,['version'=>$b['expected_version']]+$b,$action,$id),$actor);
 }
 function crmShipmentDomain(PDO $db,array $actor,int $id,array $b,string $action,callable $do,bool $scope=false): array {

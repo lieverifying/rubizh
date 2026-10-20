@@ -93,6 +93,8 @@ function crmOrderActions(array $v,array $actor): array {
  $add('problem',$can('order.problem'));
  $add('packing',$can('order.packing')&&$own&&$o==='CONFIRMED'&&$paid);
  $add('shipment',$can('shipment.manage')&&$paid&&in_array($o,['CONFIRMED','PACKING','HANDED_TO_DELIVERY'],true)&&array_filter($v['remaining']??[],fn($l)=>$l['qty']>0.00001));
+ // 5.6-2 (D-83): a TTN created outside CRM (dropshipping) — same conditions as a new parcel.
+ $add('manual_ttn',$can('shipment.manage')&&$paid&&in_array($o,['CONFIRMED','PACKING','HANDED_TO_DELIVERY'],true)&&array_filter($v['remaining']??[],fn($l)=>$l['qty']>0.00001));
  $add('complete',$can('order.complete')&&$own&&$d==='DELIVERED'&&in_array($p,['PAID','PARTIALLY_REFUNDED','REFUNDED'],true)&&$o!=='COMPLETED');
  $add('delivery_edit',$can('order.delivery.edit')&&$own&&$open&&!array_filter($v['shipments'],fn($s)=>($s['tracking_number']??'')!==''&&$s['status']!=='cancelled'));
  $add('line_supplier',$can('order.line.supplier')&&in_array('NO_SUPPLIER',$v['attention'],true)&&!$live);

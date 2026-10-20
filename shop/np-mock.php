@@ -42,6 +42,8 @@ function npMockApi(string $model,string $method,array $p): array {
             foreach((array)($p['DocumentRefs']??[]) as $ref)foreach(shopStoreDatabase()->query("SELECT k,v FROM meta WHERE k LIKE 'np_mock_doc_%'")->fetchAll(PDO::FETCH_KEY_PAIR) as $k=>$v)if((json_decode($v,true)['Ref']??'')===$ref)shopStoreDatabase()->prepare('DELETE FROM meta WHERE k=?')->execute([$k]);
             return [['Ref'=>$p['DocumentRefs'][0]??'']];
         case 'TrackingDocument.getStatusDocuments':
+            // Stand control: the last tracking request (numbers and phones) is kept for tests.
+            shopStoreDatabase()->prepare("INSERT INTO meta(k,v) VALUES('np_mock_last_tracking',?) ON DUPLICATE KEY UPDATE v=VALUES(v)")->execute([json_encode(array_values((array)($p['Documents']??[])))]);
             return array_map(fn($d)=>['Number'=>$d['DocumentNumber'],'StatusCode'=>npMockMeta('np_mock_status_'.$d['DocumentNumber'])??'1','WarehouseRecipient'=>'Відділення №1'],(array)($p['Documents']??[]));
     }
     throw new RuntimeException('Mock NP: unsupported call '.$model.'.'.$method);

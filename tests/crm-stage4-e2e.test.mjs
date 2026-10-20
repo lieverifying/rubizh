@@ -94,6 +94,29 @@ test('E2E 1: in-stock order on SITE → CRM → bank webhook → paid in CRM and
  }finally{await s.close();}
 });
 
+// Stage 5.6-2 (D-83): dropshipping — the supplier created the TTN in its own NP cabinet; the manager enters it in CRM.
+test('E2E 13: «Внести ТТН вручну» → format check in the dialog → NP status «отримано» → order completed; the buyer sees the TTN',{skip,timeout:600000},async()=>{
+ const s=await stand();
+ try{
+  const [l]=linesBySupplier(s);const b=await buyer(s,'+380671230013');await b.login();
+  const o=await b.checkout([l]);const m=await staff(s,'MANAGER');
+  await m.order(o.id);await m.act('Взяти в роботу');await b.pay(o.id);await m.order(o.id);
+  // A wrong number is explained in the dialog and refused by the server; nothing is saved.
+  await m.page.locator('.actions-bar').getByRole('button',{name:'Внести ТТН вручну',exact:true}).click();
+  let d=m.page.getByRole('dialog');await d.getByLabel(/Номер ТТН/).fill('12345');
+  await assertText(d.getByRole('alert'),/14 цифр/);await d.getByLabel(/Фактичну наявність/).check();await d.locator('.dialog-actions button').last().click();
+  await assertText(d,/14 цифр/);assert.equal(s.sql('SELECT COUNT(*) n FROM rubizh_order_shipments WHERE order_id='+o.id)[0].n,0);
+  await d.getByLabel(/Номер ТТН/).fill('2045 0123 4567 13');await d.locator('.dialog-actions button').last().click();await d.waitFor({state:'detached',timeout:20000});await m.page.waitForLoadState('networkidle');
+  assert.match(await m.text(),/20450123456713/);assert.equal(s.one('SELECT tracking_number t FROM rubizh_order_shipments WHERE order_id='+o.id).t,'20450123456713');
+  s.sql("INSERT INTO meta(k,v) VALUES('np_mock_status_20450123456713','9') ON DUPLICATE KEY UPDATE v='9'");
+  await m.act('Оновити статус',{from:m.page.locator('.parcel').filter({hasText:'20450123456713'}).first()});
+  const c=await card(s,o.id);assert.equal(c.display.delivery.code,'DELIVERED');assert.equal(c.display.order.code,'COMPLETED','all parcels received → completed');
+  const cab=await b.cabinet(o.id);assert.match(cab,/20450123456713/);assert.match(cab,/Отримано/);
+  assert.deepEqual(m.errors,[]);
+ }finally{await s.close();}
+});
+async function assertText(locator,re){for(let i=0;i<50;i++){if(re.test(await locator.innerText().catch(()=>'')))return;await new Promise(r=>setTimeout(r,100));}assert.match(await locator.innerText(),re);}
+
 const PREORDER=()=>{const m=JSON.parse(readFileSync(path.resolve(import.meta.dirname,'../contracts/pim-v3/2/wire.exact.json'),'utf8')).products.find(p=>p.id==='m-pouch');const v=m.variants.find(x=>x.sku==='RUB-F0020');return {product_id:'m-pouch',color_id:m.colors.find(c=>c.variant_skus.includes('RUB-F0020')).id,sku:'RUB-F0020',qty:1,_variant:v};};
 const IN_STOCK=()=>({product_id:'m-jacket',color_id:JSON.parse(readFileSync(path.resolve(import.meta.dirname,'../contracts/pim-v3/2/wire.exact.json'),'utf8')).products.find(p=>p.id==='m-jacket').colors.find(c=>c.variant_skus.includes('RUB-F0001')).id,sku:'RUB-F0001',qty:1});
 const lineOnly=l=>{const {_variant,...x}=l;return x;};

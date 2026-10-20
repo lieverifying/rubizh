@@ -53,6 +53,7 @@
 | `orders.delivery` | POST | `/orders/{id}/delivery` | `order.delivery.edit` | `DeliveryRequest` | `Order` | LOG-06: виправити адресу до ТТН |
 | `orders.note` | POST | `/orders/{id}/note` | `note.create` | `NoteRequest` | `Note` | Внутрішній коментар |
 | `orders.shipment.draft` | POST | `/orders/{id}/shipments` | `shipment.manage` | `ShipmentDraftRequest` | `Order` | Нове відправлення постачальника |
+| `orders.shipment.manual` | POST | `/orders/{id}/shipments/manual` | `shipment.manage` | `ManualTtnRequest` | `Order` | 5.6-2 (D-83): ТТН, створена поза CRM (кабінет постачальника або власника), вноситься вручну; одна ТТН — одна посилка з нерозподілених позицій одного постачальника; лише оплачене замовлення |
 | `orders.invoice.pdf` | GET | `/orders/{id}/invoice-pdf` | `order.invoice.pdf` | — | `Pdf` | 5-3: PDF-рахунок (оплата на рахунок ФОП); без статусу ПДВ у налаштуваннях — 409 VAT_NOTE_MISSING |
 | `orders.invoice.accept` | POST | `/orders/{id}/accept-invoice-payment` | `payment.invoice.accept` | `InvoiceAcceptRequest` | `Order` | D-51: прийняти оплату за рахунком ФОП |
 | `orders.reconcile.not_created` | POST | `/orders/{id}/reconcile-not-created` | `payment.manual_reconcile` | `ReasonRequest` | `Order` | R-C1: рахунок у банку не створено |

@@ -55,8 +55,8 @@ function npPackage(array $input): array {
       $total+=$row['weight'];$clean[]=$row;
     }return ['places'=>$clean,'weight'=>round($total,3),'seats'=>count($clean)];
 }
-function npAllocation(array $lines,array $shipments,string $code,array $selected): array {
-    if(!isset(npOrigins()[$code]))throw new RuntimeException('Невідомий постачальник — ручне уточнення.');
+function npAllocation(array $lines,array $shipments,string $code,array $selected,bool $requireOrigin=true): array {
+    if($requireOrigin&&!isset(npOrigins()[$code]))throw new RuntimeException('Невідомий постачальник — ручне уточнення.');
     $left=npRemaining($lines,$shipments);$out=[];$seen=[];
     foreach($selected as $p){if(!is_array($p))throw new RuntimeException('Перевірте позиції посилки.');$i=$p['line_no']??null;if(!is_int($i)||isset($seen[$i]))throw new RuntimeException('Невірна або повторена позиція.');$seen[$i]=true;
       $line=null;foreach($lines as $l)if((int)$l['line_no']===$i)$line=$l;
@@ -80,6 +80,40 @@ function npDraft(PDO $db,int $order,string $actor,string $op,string $code,array 
       $db->prepare("INSERT INTO rubizh_order_shipments(order_id,supplier_code,operation_key,lines_json,package_json,declared_value,status,created_at,updated_at) VALUES(?,?,?,?,?,?,'draft',UTC_TIMESTAMP(),UTC_TIMESTAMP())")->execute([$order,$code,$op,json_encode($items,JSON_THROW_ON_ERROR),json_encode($pack,JSON_THROW_ON_ERROR),$value]);$id=(int)$db->lastInsertId();npAudit($db,$actor,'shipment_draft',$order,$id);return $id;
     });
 }
+// Stage 5.6-2 (D-83): for dropshipping the owner or the supplier creates the TTN outside CRM (another NP cabinet) and
+// staff enters it by hand. One TTN = one parcel of unallocated lines of one supplier; paid orders only; the parcel is
+// then tracked and aggregated like any other (np-worker, npAggregateOrder). No NP call is made here.
+function npTrackingNumber(string $raw): string {
+    $n=(string)preg_replace('/[\s-]+/u','',$raw);
+    if(!preg_match('/^[1-9][0-9]{13}$/D',$n))throw new InvalidArgumentException('ТТН Нової пошти — 14 цифр, наприклад 20450123456789.');
+    return $n;
+}
+function npManualShipment(PDO $db,int $order,string $actor,string $op,array $selected,string $number): int {
+    shopShipmentActor($actor);
+    if(!preg_match('/^[a-f0-9]{32}$/D',$op))throw new RuntimeException('Оновіть форму посилки.');
+    $number=npTrackingNumber($number);
+    return npLocked($db,$order,function()use($db,$order,$actor,$op,$selected,$number){
+      $q=$db->prepare('SELECT id,order_id,tracking_number FROM rubizh_order_shipments WHERE operation_key=?');$q->execute([$op]);
+      if($r=$q->fetch(PDO::FETCH_ASSOC)){if((int)$r['order_id']!==$order||$r['tracking_number']!==$number)throw new RuntimeException('Ключ належить іншій посилці.');return (int)$r['id'];}
+      $o=npOrder($db,$order);if(in_array($o['status'],['cancelled','returned','completed'],true))throw new RuntimeException('Замовлення закрите.');
+      $method=$o['contact']['payment']??'';
+      if($method==='cod')throw new RuntimeException('Післяплату вимкнено. Погодьте з покупцем онлайн-оплату перед відправкою.');
+      if(!in_array($method,['card','invoice'],true)||$o['payment_status']!=='paid')throw new RuntimeException('Замовлення ще не оплачене.');
+      $c=$db->prepare('SELECT availability_confirmed FROM rubizh_np_order_confirmations WHERE order_id=?');$c->execute([$order]);
+      if((int)$c->fetchColumn()!==1)throw new RuntimeException('Спочатку підтвердьте наявність і комплектацію.');
+      $used=$db->prepare('SELECT order_id FROM rubizh_order_shipments WHERE tracking_number=?');$used->execute([$number]);
+      if(($other=$used->fetchColumn())!==false)throw new NpTrackingNumberUsed('Ця ТТН уже внесена (замовлення №'.(int)$other.').');
+      $lines=npLines($db,$order);$codes=[];
+      foreach($selected as $p)foreach($lines as $l)if(is_array($p)&&(int)$l['line_no']===($p['line_no']??null))$codes[$l['supplier_code']]=true;
+      if(count($codes)!==1)throw new RuntimeException('Одна ТТН — одна посилка від одного постачальника. Оберіть позиції одного постачальника.');
+      $code=array_key_first($codes);$items=npAllocation($lines,npShipments($db,$order),$code,$selected,false);
+      $value=round(array_sum(array_column($items,'amount')),2);
+      $db->prepare("INSERT INTO rubizh_order_shipments(order_id,supplier_code,operation_key,tracking_number,origin_label,origin_json,lines_json,declared_value,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,'created',UTC_TIMESTAMP(),UTC_TIMESTAMP())")
+        ->execute([$order,$code,$op,$number,'ТТН внесено вручну',json_encode(['source'=>'manual','entered_by'=>$actor],JSON_THROW_ON_ERROR),json_encode($items,JSON_THROW_ON_ERROR),$value]);
+      $id=(int)$db->lastInsertId();npAudit($db,$actor,'shipment_manual_ttn',$order,$id,$number);npAggregateOrder($db,$order);return $id;
+    });
+}
+final class NpTrackingNumberUsed extends RuntimeException {}
 function npConfirm(PDO $db,int $order,string $actor,bool $availability,bool $extra,string $proof,array $approval=[],?string $expectedUpdatedAt=null): void {
     shopRequirePermission($actor,'order.confirm');
     if(!$availability)throw new RuntimeException('Підтвердьте наявність і комплектацію всіх позицій.');
@@ -249,7 +283,14 @@ function npReconcile(PDO $db,int $order,int $id,string $actor): bool {
 }
 function npCancelDraft(PDO $db,int $order,int $id,string $actor): void {
     shopShipmentActor($actor);
-    npLocked($db,$order,function()use($db,$order,$id,$actor){$q=$db->prepare("UPDATE rubizh_order_shipments SET status='cancelled',updated_at=UTC_TIMESTAMP() WHERE order_id=? AND id=? AND status IN ('draft','error') AND tracking_number IS NULL");$q->execute([$order,$id]);if(!$q->rowCount())throw new RuntimeException('Можна скасувати лише чернетку або явно відхилений запит. Невідомий результат потребує звірки.');npAudit($db,$actor,'shipment_draft_cancelled',$order,$id);});
+    npLocked($db,$order,function()use($db,$order,$id,$actor){
+      // 5.6-2: a manually entered TTN (no NP movement yet) can be withdrawn when it was mistyped; the number stays in the audit.
+      $m=$db->prepare("SELECT tracking_number,origin_json FROM rubizh_order_shipments WHERE order_id=? AND id=? AND status='created' AND tracking_number IS NOT NULL");$m->execute([$order,$id]);$manual=$m->fetch(PDO::FETCH_ASSOC);
+      if($manual&&(json_decode((string)$manual['origin_json'],true)['source']??'')==='manual'){
+        $db->prepare("UPDATE rubizh_order_shipments SET status='cancelled',tracking_number=NULL,updated_at=UTC_TIMESTAMP() WHERE order_id=? AND id=? AND status='created'")->execute([$order,$id]);
+        npAudit($db,$actor,'shipment_manual_ttn_withdrawn',$order,$id,(string)$manual['tracking_number']);npAggregateOrder($db,$order);return;
+      }
+      $q=$db->prepare("UPDATE rubizh_order_shipments SET status='cancelled',updated_at=UTC_TIMESTAMP() WHERE order_id=? AND id=? AND status IN ('draft','error') AND tracking_number IS NULL");$q->execute([$order,$id]);if(!$q->rowCount())throw new RuntimeException('Можна скасувати лише чернетку або явно відхилений запит. Невідомий результат потребує звірки.');npAudit($db,$actor,'shipment_draft_cancelled',$order,$id);});
 }
 function npTrackingState(string $code): string {
     return match($code){'1'=>'created','2'=>'cancelled','3'=>'manual','4','5','6','7','8','41','101','104','111','112','12'=>'sent','9','10','11','106'=>'delivered','102','103','108'=>'returned',default=>'manual'};
