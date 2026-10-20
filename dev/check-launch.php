@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 // Read-only: checks SMTP authentication, queue counts and scheduler heartbeats. Never sends mail.
+// Stage 5.6: also the photo folder (media_dir) and, with --net, outgoing HTTPS to the supplier hosts (D-82).
 if(PHP_SAPI!=='cli'){http_response_code(404);exit;}
 define('RUBIZH_AUTH',true);
 require __DIR__.'/../auth/identities.php';
@@ -45,5 +46,19 @@ try{
  // Stage 5.5.3: the 1 UAH test products of the preview / closed staging must be off the site before the opening.
  $tp=$db->prepare("SELECT COUNT(*) FROM products WHERE visible=1 AND id IN ('rubizh-test-pay-now','rubizh-test-preorder')");$tp->execute();$report['test_products_visible']=(int)$tp->fetchColumn();$failed=$failed||$report['test_products_visible']>0;
 }catch(Throwable $e){$report['database']='failed';$failed=true;}
+// Stage 5.6-4б: without media_dir photos are never stored here and cards show the suppliers' own image links.
+try{$cfgFile=$root.'/api/config.php';$cfgAll=is_file($cfgFile)?(require $cfgFile):[];$media=is_array($cfgAll)?trim((string)($cfgAll['media_dir']??'')):'';}catch(Throwable $e){$media='';}
+$report['media_dir']=$media===''?'missing':(is_dir($media)&&is_writable($media)?'verified':'not_writable');$failed=$failed||$report['media_dir']!=='verified';
+// Stage 5.6-1: the site downloads supplier exports for PIM; the hosting must allow outgoing HTTPS (one HEAD per host).
+$report['outgoing_https']='not_checked';
+if(in_array('--net',$argv,true)){require_once $root.'/api/supplier-fetch.php';$report['outgoing_https']=[];
+ foreach(RUBIZH_SUPPLIER_FETCH_HOSTS as $host){
+  $ips=supplierFetchDns($host);if(!$ips){$report['outgoing_https'][$host]='failed: DNS';$failed=true;continue;}
+  if(!function_exists('curl_init')){$report['outgoing_https'][$host]='failed: curl';$failed=true;continue;}
+  $h=curl_init('https://'.$host.'/');curl_setopt_array($h,[CURLOPT_NOBODY=>true,CURLOPT_RETURNTRANSFER=>true,CURLOPT_FOLLOWLOCATION=>false,CURLOPT_CONNECTTIMEOUT=>8,CURLOPT_TIMEOUT=>15,CURLOPT_PROTOCOLS=>CURLPROTO_HTTPS,CURLOPT_PROXY=>'']);
+  $ok=curl_exec($h);$code=(int)curl_getinfo($h,CURLINFO_RESPONSE_CODE);$err=curl_error($h);curl_close($h);
+  $report['outgoing_https'][$host]=$ok!==false&&$code>0?'verified (HTTP '.$code.')':'failed: '.substr($err,0,80);$failed=$failed||!($ok!==false&&$code>0);
+ }
+}
 $failed=$failed||in_array($report['smtp_auth'],['failed','not_configured'],true);
 echo json_encode($report,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES|JSON_THROW_ON_ERROR)."\n";exit($failed?2:0);

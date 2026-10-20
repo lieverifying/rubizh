@@ -44,20 +44,26 @@ function monoCreate(PDO $db,int $orderId,?string $actor=null): array {
 function monoVerifySignature(string $raw,string $signature,string $base64key): bool {
  $key=base64_decode($base64key,true);$sig=base64_decode($signature,true);if($key===false||$sig===false||strlen($sig)>256)return false;return @openssl_verify($raw,$sig,$key,OPENSSL_ALGO_SHA256)===1;
 }
+// Stage 5.6-3: the key is bound to the token it was fetched with (a tag, never the token). A key fetched by the sandbox
+// token is not used after the production token is set: the next call refetches at once. An untagged key (stored before
+// this binding, or preloaded on a stand) is used as before and refreshed only when a signature fails.
+function monoPublicKeyTag(): string {return substr(hash('sha256','rubizh-mono-pubkey|'.(string)(getenv('RUBIZH_MONO_TOKEN')?:cfg('mono_token'))),0,16);}
+function monoPublicKeyOtherToken(PDO $db): bool {$tag=$db->query("SELECT v FROM meta WHERE k='mono_public_key_token'")->fetchColumn();return is_string($tag)&&$tag!==''&&!hash_equals($tag,monoPublicKeyTag());}
 function monoPublicKey(PDO $db,bool $fresh=false): string {
  $key=$db->query("SELECT v FROM meta WHERE k='mono_public_key'")->fetchColumn();
+ if(monoPublicKeyOtherToken($db)){$key=false;$fresh=true;}
  if(!$fresh&&is_string($key)&&$key!=='')return $key;
  // Invalid signatures cannot trigger unbounded outbound key refreshes.
  $claim=$db->query("SELECT GET_LOCK('rubizh-mono-pubkey',0)")->fetchColumn();
  if((int)$claim!==1){if(is_string($key)&&$key!=='')return $key;throw new RubizhHttpException(503,'Спробуйте пізніше.',5);}
  try{
-  $key=$db->query("SELECT v FROM meta WHERE k='mono_public_key'")->fetchColumn();
+  $other=monoPublicKeyOtherToken($db);$key=$other?false:$db->query("SELECT v FROM meta WHERE k='mono_public_key'")->fetchColumn();
   $last=(int)$db->query("SELECT v FROM meta WHERE k='mono_public_key_checked'")->fetchColumn();
-  if($last>time()-60){if(is_string($key)&&$key!=='')return $key;throw new RubizhHttpException(503,'Спробуйте пізніше.',60);}
+  if(!$other&&$last>time()-60){if(is_string($key)&&$key!=='')return $key;throw new RubizhHttpException(503,'Спробуйте пізніше.',60);}
   $db->prepare("INSERT INTO meta(k,v) VALUES('mono_public_key_checked',?) ON DUPLICATE KEY UPDATE v=VALUES(v)")->execute([(string)time()]);
   $r=monoApi('pubkey');$key=(string)($r['key']??'');
   if(!openssl_pkey_get_public((string)base64_decode($key,true)))throw new RuntimeException('Неприпустимий відкритий ключ monobank.');
-  $db->prepare("INSERT INTO meta(k,v) VALUES('mono_public_key',?) ON DUPLICATE KEY UPDATE v=VALUES(v)")->execute([$key]);return $key;
+  $db->prepare("INSERT INTO meta(k,v) VALUES('mono_public_key',?),('mono_public_key_token',?) ON DUPLICATE KEY UPDATE v=VALUES(v)")->execute([$key,monoPublicKeyTag()]);return $key;
  }finally{$db->query("SELECT RELEASE_LOCK('rubizh-mono-pubkey')");}
 }
 // A bank event that can never apply to its invoice (retrying cannot fix it), unlike a transient failure.

@@ -39,6 +39,15 @@ function turboSmsAccepted(array $response, string $phone): bool {
             && ($item['response_code'] ?? null)===0 && is_string($item['message_id'] ?? null) && $item['message_id']!=='') { return true; }
     } return false;
 }
+// 5.6-4е: what the provider answered (codes and statuses only — never the phone or the code) for the PHP error log.
+function turboSmsFailureNote(array $response, string $phone): string {
+    $clean=fn($v)=>substr((string)preg_replace('/[^A-Za-z0-9_ -]/','',is_scalar($v)?(string)$v:''),0,60);
+    $note='TurboSMS refused: '.$clean($response['response_code']??'').' '.$clean($response['response_status']??'');
+    foreach (is_array($response['response_result']??null)?$response['response_result']:[] as $item) {
+        if (is_array($item) && (string)($item['phone']??'')===ltrim($phone,'+')) { $note.='; recipient '.$clean($item['response_code']??'').' '.$clean($item['response_status']??''); }
+    }
+    return str_replace(ltrim($phone,'+'),'',trim($note));
+}
 function sendPhoneCode(string $phone, string $code, string $id): void {
     // Automated tests only: a test transport replaces the provider (the constant is never defined by the site).
     if (defined('RUBIZH_SMS_TESTS') && is_callable($GLOBALS['sms_test_transport'] ?? null)) { ($GLOBALS['sms_test_transport'])($phone,'RUBIZH: kod '.$code); return; }
@@ -53,7 +62,7 @@ function sendPhoneCode(string $phone, string $code, string $id): void {
         'sequence_id'=>$id,'recipients'=>[ltrim($phone,'+')],
         'sms'=>['sender'=>$c['turbosms_sender'],'text'=>'RUBIZH: kod '.$code.'. Diie 5 khv. Nikomu ne povidomliaite.']
     ],JSON_THROW_ON_ERROR),['Content-Type: application/json','Authorization: Bearer '.$c['turbosms_token']],25);
-    if (!turboSmsAccepted($result,$phone)) { throw new RuntimeException('Не вдалося надіслати SMS. Спробуйте пізніше або увійдіть через email.'); }
+    if (!turboSmsAccepted($result,$phone)) { error_log(turboSmsFailureNote($result,$phone)); throw new RuntimeException('Не вдалося надіслати SMS. Спробуйте пізніше або увійдіть через email.'); }
 }
 // Q-6: a request that looks automated must first pass a small proof-of-work check (no third-party CAPTCHA, CSP-safe,
 // solved invisibly by auth/login.js). Without JavaScript the message offers email login as the accessible fallback.

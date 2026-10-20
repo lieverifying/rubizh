@@ -49,6 +49,12 @@ function rubizhStagingKeyRequest(): bool {
     $ok=false;foreach([$all['pim_key']??'',$all['pim_key_next']??''] as $k)if(is_string($k)&&strlen($k)>=24&&hash_equals($k,$m[1]))$ok=true;
     return $ok;
 }
+// Stage 5.6-3 (D-84): the bank calls the webhook without the password. Only POST to the exact path, without a query,
+// dot segments or encoded characters, and with a signature header; shop/mono-webhook.php verifies the signature itself.
+function rubizhStagingBankWebhook(): bool {
+    $uri=(string)($_SERVER['REQUEST_URI']??'');
+    return ($_SERVER['REQUEST_METHOD']??'')==='POST'&&$uri==='/shop/mono-webhook.php'&&($_SERVER['SCRIPT_NAME']??'')==='/shop/mono-webhook.php'&&trim((string)($_SERVER['HTTP_X_SIGN']??''))!=='';
+}
 function rubizhStagingGate(): void {
     if(PHP_SAPI==='cli'||!empty($GLOBALS['rubizh_staging_gate_passed']))return;
     $c=rubizhStagingSettings();if($c['environment']!=='staging')return;
@@ -59,6 +65,7 @@ function rubizhStagingGate(): void {
         echo "Сайт тимчасово недоступний.\n";exit;
     }
     if(rubizhStagingKeyRequest()){$GLOBALS['rubizh_staging_gate_passed']=true;return;}
+    if(rubizhStagingBankWebhook()){$GLOBALS['rubizh_staging_gate_passed']=true;return;}
     [$user,$password]=rubizhStagingCredentials();$g=$c['gate'];
     if(hash_equals((string)$g['user'],$user)&&password_verify($password,(string)$g['password_hash'])){$GLOBALS['rubizh_staging_gate_passed']=true;return;}
     http_response_code(401);header('WWW-Authenticate: Basic realm="RUBIZH", charset="UTF-8"');header('Cache-Control: no-store');header('Content-Type: text/plain; charset=utf-8');
