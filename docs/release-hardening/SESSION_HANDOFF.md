@@ -6,7 +6,7 @@
 
 ## Этап 5.6 «готовность к запуску» (2026-10-21) — ссылки поставщиков через сервер, ТТН вручную, monobank, проверки «вживую»
 
-Ветки: SITE `hardening/stage-5.6` (от `fb48f47`), PIM `hardening/stage-5.6-pim` (от `24253ee`), CRM `hardening/stage-5.6` (от `70b9bfe`, закреплён в ci.yml). Теги `pim-stage-5.6-verified`, `crm-stage-5.6-verified`, `rubizh-stage-5.6-verified` — SHA и CI в аннотациях. Новый пакет — `rubizh-supplier-files/out/launch-<SHA>/ЗАПУСК.md` (старый `launch-a34bb46` не удалялся).
+Ветки: SITE `hardening/stage-5.6` (от `fb48f47`), PIM `hardening/stage-5.6-pim` (от `24253ee`), CRM `hardening/stage-5.6` (от `70b9bfe`, закреплён в ci.yml). Теги `pim-stage-5.6-verified`, `crm-stage-5.6-verified`, `rubizh-stage-5.6-verified` — SHA и CI в аннотациях. Код этапа — SITE `f63976d` (CI 39508607130 success, PHP 8.2/8.3), PIM `b8c867f` (CI 39508575196 success, 802/802), CRM `b16960d`. Новый пакет — `rubizh-supplier-files/out/launch-f63976d/` с `ЗАПУСК.md` (старый `launch-a34bb46` не удалялся; новые пароли и ключ PIM; если a34bb46 уже выложен — раздел в шаге 1).
 
 **Решения владельца (окончательные, KNOWN_ISSUES §11):**
 - D-82 — все три поставщика по ссылке; Армолайн и Киборг — через сервер сайта.
