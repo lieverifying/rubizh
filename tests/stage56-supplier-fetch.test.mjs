@@ -47,12 +47,14 @@ test('5.6-1 policy: internal and private addresses are refused after DNS, on eve
   // First answer public, the redirect hop to the same host resolves to an internal address: refused before connecting.
   $o['rebind']=attempt($u,['tactic-shop.in.ua'=>[['93.184.216.34'],['127.0.0.1']]],[[302,['location'=>'/content/export/k2.xml'],''],[200,[],'x']]);
   $o['rebind_calls']=count($GLOBALS['calls'])-$o['calls_after_private'];
+  $GLOBALS['calls']=[];$o['query']=attempt('https://tacticalbelt.salesdrive.me/export/x/export.yml?publicKey=KEEPME',['tacticalbelt.salesdrive.me'=>['93.184.216.34']],[[200,[],'<yml_catalog/>']]);$o['query_url']=$GLOBALS['calls'][0]['url'];
   $GLOBALS['calls']=[];$o['pinned']=attempt($u,['tactic-shop.in.ua'=>['93.184.216.34','2606:2800:220:1::1']],[[200,[],'<yml_catalog/>']]);$o['pin']=$GLOBALS['calls'][0];echo json_encode($o);`);
  for(const i of [0,1,2,3,4,5,6,7,9,10]){assert.equal(v['dns'+i].ok,false,'dns'+i);assert.equal(v['dns'+i].reason,'ADDRESS_FORBIDDEN','dns'+i+' (9, 10: NAT64 / 6to4 with an IPv4 inside)');}
  assert.equal(v.dns8.reason,'UNRESOLVED');
  assert.equal(v.calls_after_private,0,'no connection to a private address');
  assert.equal(v.literal.reason,'ADDRESS_FORBIDDEN');
  assert.equal(v.rebind.ok,false);assert.equal(v.rebind.reason,'ADDRESS_FORBIDDEN');assert.equal(v.rebind_calls,1,'the second hop never connects');
+ assert.equal(v.query_url,'https://tacticalbelt.salesdrive.me/export/x/export.yml?publicKey=KEEPME','the canonical address keeps the query (the supplier key)');
  assert.equal(v.pinned.ok,true);assert.deepEqual(v.pin.ips,['93.184.216.34','2606:2800:220:1::1'],'the transport connects only to the checked addresses');
 });
 
