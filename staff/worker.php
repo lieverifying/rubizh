@@ -5,7 +5,9 @@ declare(strict_types=1);
 // Every producer is idempotent through dedupe keys / auto_key, so a repeated or overlapping run changes nothing.
 if(PHP_SAPI!=='cli'){http_response_code(404);exit;}
 define('RUBIZH_AUTH_NO_SESSION',true);
-require_once dirname(__DIR__).'/auth/bootstrap.php';require_once __DIR__.'/bootstrap.php';
+// Stage 5.6.1: the same bootstrap as the Staff API (api/staff/index.php). auth/bootstrap.php declares database() too —
+// loading both was a fatal «Cannot redeclare database()», so the worker never ran on the hosting.
+require_once __DIR__.'/bootstrap.php';
 
 function crmWorkerRun(PDO $db): array {
  if(!crmApiSchemaReady($db))return ['skipped'=>'schema'];

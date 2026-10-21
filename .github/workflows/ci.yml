@@ -72,6 +72,11 @@ jobs:
           /workspace/php-runtime/root/usr/bin/php8.4 -n -d extension=/x/pdo.so -d extension=/x/mysqlnd.so -d extension=/x/pdo_mysql.so -r 'echo implode(",",PDO::getAvailableDrivers()),"\n";'
       - name: PHP syntax
         run: git ls-files '*.php' | xargs -n1 -P4 php -l > /dev/null
+      - name: Apache 2.4 for the .htaccess routing test behind the hosting HTTPS proxy (stage561-proxy-https)
+        run: |
+          if [ ! -x /usr/sbin/apache2 ]; then sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends apache2; fi
+          sudo systemctl stop apache2 2>/dev/null || true
+          /usr/sbin/apache2 -v
       - name: Tests (MariaDB over the service socket)
         env:
           RUBIZH_TEST_MYSQL_SOCKET: /tmp/mysqld/mysqld.sock

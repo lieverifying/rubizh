@@ -226,7 +226,8 @@ test('E2E 7: disputed MonoPay event → «Потребують перевірк�
   const r=await b.post('/shop/payment-start.php',{order_id:o.id});assert.equal(r.status,200);
   const inv=s.one('SELECT * FROM rubizh_mono_invoices WHERE order_id='+o.id+' AND invoice_id IS NOT NULL');
   const w=await s.webhook({...inv,amount:+inv.amount+100});assert.equal(w.status,200,'permanent mismatch is acknowledged and parked');
-  php(`require '${s.site}/staff/worker.php';`,{allowFail:true});
+  // 5.6.1: the worker must really run and succeed — allowFail hid «Cannot redeclare database()» since CRM stage 4.
+  php(`require '${s.site}/staff/worker.php';echo json_encode(crmWorkerRun(shopStoreDatabase()));`);
   const u=await staff(s,'OWNER');await u.page.goto(s.base+'/crm/payments?view=review');await u.page.getByRole('heading',{level:1}).waitFor();await u.page.waitForLoadState('networkidle');
   const row=()=>u.page.locator('.parcel').filter({hasText:o.number}).first();await row().waitFor();
   await row().getByRole('button',{name:'Перевірити в банку зараз'}).click();await u.page.getByText('Банк перевірено').first().waitFor();
