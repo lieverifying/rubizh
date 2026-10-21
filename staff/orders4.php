@@ -13,6 +13,7 @@ function crmHandle(PDO $db,?array $actor,array $route,array $p,array $b,array $q
   'auth.totp.enable'=>crmTotpEnable($db,$actor,$b['code']),
   'auth.token.accept'=>crmTokenAccept($db,$b['token'],$b['password']),
   'me.view'=>$actor,
+  'pim.connection'=>crmPimConnection(),
   'me.preferences'=>crmPreferences($db,$actor,$b),
   'me.password'=>crmPasswordChange($db,$actor,$b),
   'me.sessions'=>crmSessionsList($db,$actor['id']),

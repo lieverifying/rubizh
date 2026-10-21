@@ -46,6 +46,8 @@ function crmApiTableExists(PDO $db,string $table): bool {static $seen=[];if(!arr
 function crmCsrf(array $b): void {
  $token=$_SERVER['HTTP_X_CSRF_TOKEN']??$b['csrf']??null;
  if(!is_string($token)||!hash_equals($_SESSION['staff_csrf']??'',$token))throw new CrmError('CSRF_INVALID',403);
+ // 5.6.2: the PIM origin is accepted only on the PIM sign-in routes (router.php CRM_PIM_ROUTES).
+ if(!empty($GLOBALS['crm_pim_origin_route'])&&crmPimOrigin()!==null)return;
  if(isset($_SERVER['HTTP_ORIGIN'])){$actual=parse_url((string)$_SERVER['HTTP_ORIGIN']);$host=$_SERVER['HTTP_HOST']??'';$expected=($actual['host']??'').(isset($actual['port'])?':'.$actual['port']:'');if($expected!==$host||($actual['scheme']??'')!==((($_SERVER['HTTPS']??'')==='on')?'https':'http'))throw new CrmError('CSRF_INVALID',403);}
 }
 /**

@@ -182,6 +182,7 @@
 | GET | `/audit` | `audit.view` |  |  |  | 200 | 200 | 403 | 403 | 200 |
 | GET | `/analytics` | `report.view` |  |  |  | 200 | 403 | 403 | 403 | 200 |
 | GET | `/site-speed` | `site.speed.view` |  |  |  | 200 | 403 | 403 | 403 | 403 |
+| GET | `/pim/connection` | `settings.system` |  |  |  | 200 | 403 | 403 | 403 | 403 |
 | GET | `/reports` | `dashboard.view` |  |  |  | 200 | 200 | 200 | 200 | 200 |
 | GET | `/settings` | `settings.personal` |  |  |  | 200 | 200 | 200 | 200 | 200 |
 | POST | `/settings/system` | `settings.system` |  |  | ✓ | 200 | 403 | 403 | 403 | 403 |

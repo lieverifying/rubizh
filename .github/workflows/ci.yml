@@ -36,7 +36,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: alexalixmanov-del/crm.rubizh
-          ref: b16960d9de4ba052c8c54ddb24d0210f8c87bda7
+          ref: 7ba3a1791fad22855b3179d94a39c0adc0fbce0d
           path: crm
       - uses: shivammathur/setup-php@v2
         with:

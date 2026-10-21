@@ -9,9 +9,10 @@ declare(strict_types=1);
 function rubizhStagingSettings(): array {
     static $c=null;if($c!==null)return $c;
     $f=$GLOBALS['rubizh_config_file']??dirname(__DIR__).'/api/config.php';$all=is_file($f)?(require $f):[];
-    $c=['environment'=>is_array($all)?($all['environment']??null):null,'gate'=>is_array($all)?($all['staging_gate']??null):null,'mono_mock'=>is_array($all)?($all['mono_mock']??null):null];
+    $c=['environment'=>is_array($all)?($all['environment']??null):null,'gate'=>is_array($all)?($all['staging_gate']??null):null,'mono_mock'=>is_array($all)?($all['mono_mock']??null):null,'noindex'=>is_array($all)?($all['noindex']??null):null];
     return $c;
 }
+function rubizhSiteNoindex(): bool {return rubizhStagingSettings()['noindex']===true;}
 // Stage 5.5 review: lowercase, no port, no trailing dot; anything that is not a local name is treated as public.
 function rubizhRequestHost(): string {$h=strtolower(trim((string)($_SERVER['HTTP_HOST']??'')));if(preg_match('/^\[([0-9a-f:.]+)\](?::\d+)?$/D',$h,$m))return $m[1];return rtrim((string)preg_replace('/:\d+$/D','',$h),'.');}
 function rubizhLocalStand(): bool {
@@ -70,6 +71,8 @@ function rubizhStagingBankWebhook(): bool {
 }
 function rubizhStagingGate(): void {
     if(PHP_SAPI==='cli'||!empty($GLOBALS['rubizh_staging_gate_passed']))return;
+    // 5.6.2 (owner decision): open before opening day, but not indexed — the working mode with 'noindex'=>true, no password.
+    if(rubizhSiteNoindex()&&!headers_sent())header('X-Robots-Tag: noindex, nofollow');
     $c=rubizhStagingSettings();if($c['environment']!=='staging')return;
     if(!headers_sent())header('X-Robots-Tag: noindex, nofollow');
     if(!rubizhStagingGateConfigured()){

@@ -2,7 +2,7 @@
 declare(strict_types=1);
 require __DIR__.'/shop/catalog-lib.php';
 // Stage 5.5 (D-80): no sitemap in the closed staging mode (a local stand keeps it).
-if(rubizhStagingGateConfigured()){http_response_code(404);header('Cache-Control: no-store');exit;}
+if(rubizhStagingGateConfigured()||rubizhSiteNoindex()){http_response_code(404);header('Cache-Control: no-store');exit;}
 // Buffered: a failure in the middle answers 503, never a truncated XML with 200 (review of stage 5).
 ob_start();
 try{$db=db();header('Content-Type: application/xml; charset=utf-8');header('Cache-Control: public,max-age=3600');echo '<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">';

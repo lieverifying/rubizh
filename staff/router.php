@@ -49,6 +49,21 @@ function crmIdempotencyKey(array $route,array $body): ?string {
  return $key;
 }
 
+// 5.6.2 (owner decision): one login for CRM and PIM. PIM runs on another origin of the same site (pim_origins, exact match)
+// and signs in through these four routes only, with credentials; every other route stays same-origin (no CORS, CSRF refuses
+// the PIM origin). /pim/connection hands the API address and the PIM key to the OWNER session.
+const CRM_PIM_ROUTES=['auth.session','auth.login','auth.logout','pim.connection'];
+function crmPimOrigin(): ?string {
+ $origin=(string)($_SERVER['HTTP_ORIGIN']??'');$allowed=cfg('pim_origins');
+ return $origin!==''&&is_array($allowed)&&in_array($origin,$allowed,true)?$origin:null;
+}
+function crmPimCors(string $origin): void {header('Access-Control-Allow-Origin: '.$origin);header('Access-Control-Allow-Credentials: true');header('Vary: Origin');}
+function crmPimConnection(): array {
+ $key=cfg('pim_key');if(!is_string($key)||strlen($key)<24)throw new CrmError('SERVICE_UNAVAILABLE',503);
+ $base=rtrim((string)(cfg('public_base_url')??''),'/');
+ if($base===''){$host=(string)($_SERVER['HTTP_HOST']??'');if(preg_match('/^[A-Za-z0-9.-]+(?::\d+)?$/D',$host)!==1)throw new CrmError('SERVICE_UNAVAILABLE',503);$base=((($_SERVER['HTTPS']??'')==='on')?'https':'http').'://'.$host;}
+ return ['api_url'=>$base.'/api','pim_key'=>$key];
+}
 function crmDispatch(): never {
  $GLOBALS['crm_request_id']=bin2hex(random_bytes(16));
  try{
@@ -56,7 +71,13 @@ function crmDispatch(): never {
   // Path without query, percent-decoded once (customer ids contain ':'); route parameters are then regex-validated.
   $path=preg_replace('~^/api/staff~','',rawurldecode((string)strtok((string)($_SERVER['REQUEST_URI']??'/'),'?')));$method=$_SERVER['REQUEST_METHOD']??'GET';
   if(preg_match('/[\x00-\x1f\x7f]/',$path))throw new CrmError('NOT_FOUND',404);
+  if($method==='OPTIONS'){
+   $origin=crmPimOrigin();$want=strtoupper(trim((string)($_SERVER['HTTP_ACCESS_CONTROL_REQUEST_METHOD']??'')));$pm=$origin!==null&&$want!==''?crmRouteMatch($want,$path):null;
+   if(!$pm||!in_array($pm[0]['id'],CRM_PIM_ROUTES,true))throw new CrmError('NOT_FOUND',404);
+   crmPimCors($origin);header('Access-Control-Allow-Methods: GET, POST');header('Access-Control-Allow-Headers: Content-Type, X-CSRF-Token');header('Access-Control-Max-Age: 600');http_response_code(204);exit;
+  }
   $m=crmRouteMatch($method,$path);if(!$m)throw new CrmError('NOT_FOUND',404);[$route,$params]=$m;
+  if(($origin=crmPimOrigin())!==null&&in_array($route['id'],CRM_PIM_ROUTES,true)){crmPimCors($origin);$GLOBALS['crm_pim_origin_route']=true;}
   // Limit per staff session (not per office IP, R8/PL-1); anonymous requests are limited per network identity.
   $limitKey=isset($_SESSION['staff_id'])?'s|'.session_id():'n|'.rubizhNetworkIdentity();
   if(!rubizhRateAllow('staff-request',$limitKey,240,60)){header('Retry-After: 60');throw new CrmError('RATE_LIMITED',429,['retry_after'=>60]);}
