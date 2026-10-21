@@ -55,6 +55,8 @@ function shopStorefrontBuild(PDO $db): array {
   // complete slot catalogue separately, with its own pagination and filters.
   $q=$db->prepare("SELECT p.id FROM products p WHERE p.visible=1 AND ".shopUsablePhotoSql('p')." AND EXISTS(SELECT 1 FROM variants av WHERE av.product_id=p.id AND ".shopBuyableSql('av').") AND ".shopKitPrimarySql($slot)." AND ".shopKitSlotSql()."=? ORDER BY FIELD(p.availability,'in','order','out'), CASE WHEN LOWER(p.name) REGEXP 'убакс|ubacs|куртк|плитоноск|шолом|рюкзак|турнікет|аптечка' THEN 0 ELSE 1 END,p.price_min,p.id LIMIT 12");$q->execute([$slot]);array_push($ids,...$q->fetchAll(PDO::FETCH_COLUMN));
  }
+ // 5.7 (D-88): the cross-sell sets travel with the page — «Додати до замовлення» is offered under every order.
+ $q=$db->query("SELECT p.id FROM products p WHERE p.visible=1 AND ".shopUsablePhotoSql('p')." AND (CASE WHEN JSON_VALID(p.data) THEN JSON_UNQUOTE(JSON_EXTRACT(p.data,'$.cross_sell')) END)='true' AND EXISTS(SELECT 1 FROM variants av WHERE av.product_id=p.id AND ".shopBuyableSql('av').") ORDER BY p.price_min,p.id LIMIT 8");array_push($ids,...$q->fetchAll(PDO::FETCH_COLUMN));
  foreach($kits as $b)foreach($b['items']??[] as $it)$ids[]=is_string($it)?$it:($it['product_id']??'');$products=[];foreach(array_chunk(array_values(array_unique($ids)),200) as $batch)array_push($products,...shopProductsByIds($db,$batch));$byId=array_column($products,null,'id');
  $resolved=[];$used=[];foreach($kits as $b){$r=shopKitResolve($b,$byId,$db);if(!$r||array_intersect($used,array_column($r['items'],'product_id')))continue;$resolved[]=$r;array_push($used,...array_column($r['items'],'product_id'));}
  $keepAttrs=['Сезон','Сезонність','Сезонность','Комплектація','Комплектация','Одиниця продажу','Одиниця виміру'];

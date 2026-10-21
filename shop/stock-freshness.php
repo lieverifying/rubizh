@@ -51,13 +51,13 @@ function shopFreshnessRaw(array $v): array {
     $col=static fn(string $c)=>(int)($v[$c]??0)===1;
     if(array_key_exists('j_pay',$v)){
         $b=static fn($x,bool $fallback)=>$x===null||$x==='null'?$fallback:in_array(strtolower(trim((string)$x)),['true','1'],true);
-        $imported=is_string($v['j_imported']??null)&&ctype_digit(trim($v['j_imported']))?(int)$v['j_imported']:null;
-        return [$b($v['j_submit']??null,$col('pim_order_submission_allowed')),$b($v['j_pay'],$col('pim_payment_allowed')),$b($v['j_confirm']??null,$col('pim_requires_order_confirmation')),$imported];
+        $ms=static fn($x)=>is_string($x)&&ctype_digit(trim($x))?(int)$x:null;
+        return [$b($v['j_submit']??null,$col('pim_order_submission_allowed')),$b($v['j_pay'],$col('pim_payment_allowed')),$b($v['j_confirm']??null,$col('pim_requires_order_confirmation')),$ms($v['j_imported']??null),$ms($v['j_valid']??null)];
     }
     $raw=json_decode((string)($v['data']??''),true);$raw=is_array($raw)?$raw:[];
     $flag=static fn(string $k,string $c)=>array_key_exists($k,$raw)?(bool)$raw[$k]:$col($c);
-    $imported=$raw['stock_imported_at']??null;
-    return [$flag('order_submission_allowed','pim_order_submission_allowed'),$flag('payment_allowed','pim_payment_allowed'),$flag('requires_order_confirmation','pim_requires_order_confirmation'),is_int($imported)&&$imported>0?$imported:null];
+    $imported=$raw['stock_imported_at']??null;$valid=$raw['stock_valid_until']??null;
+    return [$flag('order_submission_allowed','pim_order_submission_allowed'),$flag('payment_allowed','pim_payment_allowed'),$flag('requires_order_confirmation','pim_requires_order_confirmation'),is_int($imported)&&$imported>0?$imported:null,is_int($valid)&&$valid>0?$valid:null];
 }
 /** Data time of a SKU: the supplier's observation time, else the PIM import time; null = unknown. */
 function shopFreshnessDataTime(array $v): ?int {
@@ -68,7 +68,11 @@ function shopFreshnessDataTime(array $v): ?int {
 /** FRESH | CONFIRM | HIDDEN for one variant row. */
 function shopFreshnessTier(array $v,array $policy,?int $nowMs=null): string {
     if(($v['pim_availability_source']??null)==='MANUAL')return 'FRESH';
-    $now=$nowMs??(int)floor(microtime(true)*1000);$time=shopFreshnessDataTime($v);
+    $now=$nowMs??(int)floor(microtime(true)*1000);
+    $time=shopFreshnessDataTime($v);
+    // 5.7: «Прайс актуальний до» of a manual-price supplier — fresh until that date, which may be at most 62 days after the data
+    // time itself (review: never measured from «now», so old data cannot become fresh again); then the rule below.
+    $valid=shopFreshnessRaw($v)[4]??null;if($valid!==null&&$time!==null&&$now<=$valid&&$valid<=$time+62*86400000)return 'FRESH';
     if($time===null||$time>$now+86400000)return 'CONFIRM';
     $age=$now-$time;
     if($age<=$policy['pay_fresh_hours']*3600000)return 'FRESH';
@@ -112,7 +116,7 @@ function shopFreshnessSweep(PDO $db,bool $force=false,?array $productIds=null,bo
         $in=$scoped?' AND v.product_id IN ('.implode(',',array_fill(0,count($productIds),'?')).')':'';
         $q=$db->prepare("SELECT v.product_id,v.sku,v.pim_revision,v.pim_stock_observed_at,v.pim_availability_source,v.pim_order_submission_allowed,v.pim_payment_allowed,v.pim_requires_order_confirmation,v.availability,
             MD5(COALESCE(v.data,'')) data_md5,CASE WHEN JSON_VALID(v.data) THEN JSON_EXTRACT(v.data,'$.order_submission_allowed') END j_submit,CASE WHEN JSON_VALID(v.data) THEN JSON_EXTRACT(v.data,'$.payment_allowed') END j_pay,
-            CASE WHEN JSON_VALID(v.data) THEN JSON_EXTRACT(v.data,'$.requires_order_confirmation') END j_confirm,CASE WHEN JSON_VALID(v.data) THEN JSON_EXTRACT(v.data,'$.stock_imported_at') END j_imported
+            CASE WHEN JSON_VALID(v.data) THEN JSON_EXTRACT(v.data,'$.requires_order_confirmation') END j_confirm,CASE WHEN JSON_VALID(v.data) THEN JSON_EXTRACT(v.data,'$.stock_imported_at') END j_imported,CASE WHEN JSON_VALID(v.data) THEN JSON_EXTRACT(v.data,'$.stock_valid_until') END j_valid
             FROM variants v JOIN products p ON p.id=v.product_id WHERE p.pim_contract_version=3 AND v.pim_active=1$in ORDER BY v.product_id,v.sku");
         $q->execute($scoped?$productIds:[]);
         $set=$db->prepare('UPDATE variants SET pim_order_submission_allowed=?,pim_payment_allowed=?,pim_requires_order_confirmation=?,availability=? WHERE product_id=? AND sku=? AND pim_active=1 AND pim_revision<=>? AND pim_stock_observed_at<=>? AND MD5(COALESCE(data,\'\'))=?');

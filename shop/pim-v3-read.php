@@ -66,6 +66,8 @@ function pimV3ProductDto(PDO $db,array $row): array {
     $payable=array_filter($variants,fn($v)=>$v['order_submission_allowed']&&$v['price']!==null);
     $prices=array_column($payable?:array_filter($variants,fn($v)=>$v['price']!==null),'price');
     return ['contract_version'=>3,'id'=>$id,'model_id'=>$row['pim_model_id']??$id,'slug'=>$row['slug'],'name'=>$row['name'],'brand'=>shopBrand((string)$row['brand']),
+        // 5.7 (D-88): set at sync from the private supplier routing (pimV3SyncSupplierFlags); no supplier data leaves SITE.
+        'cross_sell'=>!empty($data['cross_sell']),'separate_parcel'=>!empty($data['separate_parcel']),
         'canonical_category_id'=>$taxonomy['canonical_category_id']??($data['canonical_category_id']??null),'category'=>$taxonomy['category']??$row['category_path'],'category_url'=>$taxonomy['category_url']??null,
         'kit_slot'=>$row['pim_kit_slot']??null,'sale_unit'=>'pcs','description'=>shopDescription((string)($data['description']??$row['description'])),'attributes'=>is_array($data['attributes']??null)?$data['attributes']:[],
         'price_min'=>$prices?min($prices):null,'availability'=>$row['availability'],

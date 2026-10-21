@@ -1,0 +1,15 @@
+/* 5.7 (owner D-88): «Додати до замовлення» under the cart lines and the «окремою посилкою» note. Theme tokens only, so both
+   themes work; on phones (360–430 px) one card per row, buttons ≥ 44 px, text ≥ 14 px. */
+.rz-xsell{margin:18px 0 0;padding:14px;border:1px solid var(--border);background:var(--surface);min-width:0}
+.rz-xsell-title{font-family:'UAH','Oswald',sans-serif;font-weight:600;font-size:16px;line-height:1.3;text-transform:uppercase;letter-spacing:.06em;margin:0 0 10px;color:var(--text)}
+.rz-xsell-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px}
+.rz-xsell-card{display:flex;gap:12px;align-items:flex-start;border:1px solid var(--border);padding:10px;background:var(--bg);min-width:0}
+.rz-xsell-photo{flex:0 0 72px;width:72px;height:72px;display:block;background:var(--surface)}
+.rz-xsell-photo img{width:72px;height:72px;object-fit:cover;display:block}
+.rz-xsell-body{display:flex;flex-direction:column;gap:6px;min-width:0;flex:1}
+.rz-xsell-name{font-size:14px;line-height:1.35;color:var(--text);overflow-wrap:anywhere}
+.rz-xsell-price{font-size:15px;font-weight:600;color:var(--text)}
+.rz-separate-note{font-size:14px;line-height:1.4;color:var(--muted);margin:4px 0 0}
+.rz-xsell-add{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;min-height:44px;min-width:44px;padding:0 18px;border:1px solid var(--accent);background:var(--accent);color:var(--button-text);font:inherit;font-size:14px;font-weight:600;letter-spacing:.04em;cursor:pointer;align-self:flex-start}
+.rz-xsell-add:focus-visible{outline:2px solid var(--text);outline-offset:2px}
+@media (max-width:430px){.rz-xsell{padding:12px}.rz-xsell-list{grid-template-columns:1fr}}

@@ -10,7 +10,7 @@
 <script defer src="/assets/react-dom.c5c970a9cf36.js"></script>
 <script defer src="/assets/category-directory.2026100802.js"></script>
 <script defer src="/assets/pim-v3-product.2026101701.js?v=2026101701"></script>
-<script defer src="/assets/shop-client.2026101803.js"></script>
+<script defer src="/assets/shop-client.2026102101.js"></script>
 <script defer src="/assets/vitals.2026101801.js"></script>
 <script defer src="/assets/store-runtime.6103e16b1d5f.js"></script>
 
@@ -26,7 +26,7 @@
 
 
 
-<style>.rz-msgs{display:flex;flex-wrap:wrap;gap:2px;margin:6px 0 0 -10px}.rz-msg{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:10px;color:var(--legacy-a9b3a6);text-decoration:none;transition:color .15s}.rz-msg:hover,.rz-msg:focus-visible{color:var(--link)}.rz-msg>span{display:block;width:24px;height:24px;background:currentColor;-webkit-mask:var(--rz-msg) center/contain no-repeat;mask:var(--rz-msg) center/contain no-repeat}.rz-msg-viber{--rz-msg:url(/assets/messenger-viber.2026101801.svg)}.rz-msg-whatsapp{--rz-msg:url(/assets/messenger-whatsapp.2026101801.svg)}.rz-msg-telegram{--rz-msg:url(/assets/messenger-telegram.2026101801.svg)}.rz-msg-signal{--rz-msg:url(/assets/messenger-signal.2026101801.svg)}[aria-disabled="true"]{opacity:.6;pointer-events:none}@media(max-width:860px){[data-mob-buy]{box-shadow:0 -8px 24px #0005}[data-prod-section]{padding-bottom:150px!important}}a:focus-visible,button:focus-visible,[role="button"]:focus-visible{outline:2px solid var(--legacy-f5a332);outline-offset:3px}</style><link rel="stylesheet" href="/assets/head-bundle.2026102101.css">
+<style>.rz-msgs{display:flex;flex-wrap:wrap;gap:2px;margin:6px 0 0 -10px}.rz-msg{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:10px;color:var(--legacy-a9b3a6);text-decoration:none;transition:color .15s}.rz-msg:hover,.rz-msg:focus-visible{color:var(--link)}.rz-msg>span{display:block;width:24px;height:24px;background:currentColor;-webkit-mask:var(--rz-msg) center/contain no-repeat;mask:var(--rz-msg) center/contain no-repeat}.rz-msg-viber{--rz-msg:url(/assets/messenger-viber.2026101801.svg)}.rz-msg-whatsapp{--rz-msg:url(/assets/messenger-whatsapp.2026101801.svg)}.rz-msg-telegram{--rz-msg:url(/assets/messenger-telegram.2026101801.svg)}.rz-msg-signal{--rz-msg:url(/assets/messenger-signal.2026101801.svg)}[aria-disabled="true"]{opacity:.6;pointer-events:none}@media(max-width:860px){[data-mob-buy]{box-shadow:0 -8px 24px #0005}[data-prod-section]{padding-bottom:150px!important}}a:focus-visible,button:focus-visible,[role="button"]:focus-visible{outline:2px solid var(--legacy-f5a332);outline-offset:3px}</style><link rel="stylesheet" href="/assets/head-bundle.2026102102.css">
 <script>window.RUBIZH_CATEGORY_ART={"armor": "/assets/category-armor.8d7b42242386.webp", "uniform": "/assets/category-uniforms.5f699a831579.webp", "boots": "/assets/category-footwear.6a8bd09a2528.webp", "gear": "/assets/category-backpacks.3ab1ce8d263c.webp", "camo": "/assets/category-camouflage.bf6b4c5b3b74.webp", "rain": "/assets/category-ponchos.0930cacaacc9.webp", "thermal": "/assets/category-clothing.b7a37481bb06.webp", "accessories": "/assets/category-gloves.39fac99cf3ba.webp", "med": "/assets/category-medical.b31954343e29.webp", "head": "/assets/category-helmets.54eeb057cd4f.webp"};</script>
 
 
@@ -848,7 +848,7 @@
           <sc-if value="{{ nativeHint }}" hint-placeholder-val="{{ false }}"><div style="color:var(--legacy-99a398);font-size:12.5px;margin:-2px 0 10px">{{ nativeHint }}</div></sc-if>
           <sc-if value="{{ sizeNote }}" hint-placeholder-val="{{ false }}">
             <div style="{{ sizeNoteStyle }}">{{ sizeNote }}</div>
-          </sc-if>
+          </sc-if><sc-if value="{{ separateNote }}" hint-placeholder-val="{{ false }}"><div class="rz-separate-note" data-separate-parcel="1">Надійде окремою посилкою, доставка за тарифом Нової пошти</div></sc-if>
 
           <sc-if value="{{ showPreWarn }}" hint-placeholder-val="{{ false }}">
             <div style="border:1px solid var(--legacy-4e4524);background:var(--legacy-211e14);padding:16px;margin-bottom:16px">
@@ -1003,7 +1003,7 @@
                   <div style="color:var(--legacy-99a398);font-size:12.5px;margin-top:4px">Розмір {{ l.size }} · {{ l.camo }}</div>
                   <div style="{{ l.stockNoteStyle }}">{{ l.stockNote }}</div>
                   <div style="color:var(--legacy-8a9487);font-size:11.5px;margin-top:3px;font-family:ui-monospace,Menlo,Consolas,monospace">{{ l.sku }}</div>
-                  <sc-if value="{{ l.capNote }}" hint-placeholder-val="{{ false }}"><div style="color:var(--legacy-d8be62);font-size:12px;margin-top:4px">{{ l.capNote }}</div></sc-if>
+                  <sc-if value="{{ l.separateNote }}" hint-placeholder-val="{{ false }}"><div class="rz-separate-note" data-separate-parcel="1">Надійде окремою посилкою, доставка за тарифом Нової пошти</div></sc-if><sc-if value="{{ l.capNote }}" hint-placeholder-val="{{ false }}"><div style="color:var(--legacy-d8be62);font-size:12px;margin-top:4px">{{ l.capNote }}</div></sc-if>
                   <sc-if value="{{ l.hasIssue }}" hint-placeholder-val="{{ false }}">
                     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:8px;padding:9px 11px;border:1px solid var(--legacy-4a2c21);background:var(--legacy-231a17)">
                       <div style="flex:1 1 180px;min-width:0;color:var(--legacy-e0b9a8);font-size:12.5px;line-height:1.45">{{ l.issue }}</div>
@@ -1019,7 +1019,7 @@
                 <div style="font-family:'UAH','Oswald',sans-serif;font-size:19px;min-width:96px;text-align:right">{{ l.sumFmt }}</div>
                 <div tabindex="0" role="button" sc-camel-on-click="{{ l.remove }}" style="color:var(--legacy-8a9487);cursor:pointer;font-size:18px;padding:0 4px" style-hover="color:var(--legacy-d9542b)">✕</div>
               </div>
-            </sc-for>
+            </sc-for><sc-if value="{{ hasCrossSell }}" hint-placeholder-val="{{ false }}"><section class="rz-xsell" data-cross-sell="1" aria-labelledby="rz-xsell-title"><h2 class="rz-xsell-title" id="rz-xsell-title">Додати до замовлення</h2><div class="rz-xsell-list"><sc-for list="{{ crossSell }}" as="x" hint-placeholder-count="2"><div class="rz-xsell-card" data-cross-sell-card="1"><a class="rz-xsell-photo" href="{{ x.href }}" sc-camel-on-click="{{ x.open }}" aria-label="{{ x.name }}"><sc-if value="{{ x.hasThumb }}"><img sc-camel-src="{{ x.thumb }}" alt="" loading="lazy" decoding="async"></sc-if></a><div class="rz-xsell-body"><div class="rz-xsell-name">{{ x.name }}</div><div class="rz-xsell-price">{{ x.priceFmt }}</div><sc-if value="{{ x.separateNote }}" hint-placeholder-val="{{ false }}"><div class="rz-separate-note" data-separate-parcel="1">Надійде окремою посилкою, доставка за тарифом Нової пошти</div></sc-if><div tabindex="0" role="button" class="rz-xsell-add" data-cross-sell-add="1" sc-camel-on-click="{{ x.add }}">Додати</div></div></div></sc-for></div></section></sc-if>
             <sc-if value="{{ cartEmpty }}" hint-placeholder-val="{{ false }}">
               <div style="padding:44px;text-align:center;color:var(--legacy-99a398)">Кошик порожній. <span tabindex="0" role="button" sc-camel-on-click="{{ goCatalog }}" style="color:var(--link);cursor:pointer">Перейти до каталогу</span></div>
             </sc-if>

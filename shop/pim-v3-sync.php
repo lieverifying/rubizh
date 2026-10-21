@@ -90,7 +90,7 @@ function pimV3KitSlot(?string $component): ?string {
         'carrier'=>'armor','plates'=>'armor','helmet'=>'head','hearing'=>'head','eye_protection'=>'head','backpack'=>'gear','pouch'=>'gear','rps'=>'gear','battle_belt'=>'gear','ifak'=>'med','tourniquet'=>'med'][$component??'']??null;
 }
 function pimV3PublicVariantData(array $v): array {
-    $keep=['sku','color_id','color','camouflage','size','size_raw','size_display','size_normalized','size_system','size_status','size_type','size_alpha','size_fit','size_height','availability','order_submission_allowed','payment_allowed','requires_order_confirmation','delivery_lead_time_days','ready_to_dispatch','price_ready','pricing_policy_version','price','site_price','kit_price','wholesale','stock_observed_at','stock_imported_at','stale_source','expires_at','barcode','sale_mode','price_unit'];
+    $keep=['sku','color_id','color','camouflage','size','size_raw','size_display','size_normalized','size_system','size_status','size_type','size_alpha','size_fit','size_height','availability','order_submission_allowed','payment_allowed','requires_order_confirmation','delivery_lead_time_days','ready_to_dispatch','price_ready','pricing_policy_version','price','site_price','kit_price','wholesale','stock_observed_at','stock_imported_at','stock_valid_until','stale_source','expires_at','barcode','sale_mode','price_unit'];
     $out=array_intersect_key($v,array_fill_keys($keep,true));
     if(isset($out['wholesale']))$out['wholesale']=array_map(fn($t)=>array_intersect_key((array)$t,array_fill_keys(['price','discount','requested_discount','capped'],true)),(array)$out['wholesale']);
     return $out;
@@ -221,7 +221,7 @@ function pimV3WriteModel(PDO $db,array $m,string $batch,string $revision): strin
         if(is_string($v['fulfillment_supplier_sku']??null)&&$v['fulfillment_supplier_sku']!=='')$articles[$v['sku']]=['supplier_name'=>$fulfillment[$v['sku']]??'','supplier_sku'=>mb_substr($v['fulfillment_supplier_sku'],0,120)];
     }
     pimV3InsertRows($db,'INSERT INTO variants('.implode(',',$cols).')',count($cols),$vRows,$vTail);
-    sync_product_fulfillment($db,$id,$fulfillment);sync_product_supplier_articles($db,$id,$articles);
+    sync_product_fulfillment($db,$id,$fulfillment);sync_product_supplier_articles($db,$id,$articles);pimV3SyncSupplierFlags($db,$id,$fulfillment,$articles);
     shopPricingStore($db,$id,array_filter($policies));
     // Size catalogs/options are assortment, not inventory; options never carry SKU/stock.
     $sc=$db->prepare('INSERT INTO rubizh_size_catalogs(product_id,catalog_id,scope,color_id,size_system,allowed_sizes_json,revision) VALUES(?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE scope=VALUES(scope),color_id=VALUES(color_id),size_system=VALUES(size_system),allowed_sizes_json=VALUES(allowed_sizes_json),revision=VALUES(revision)');
@@ -318,4 +318,17 @@ function pimV3HandleSync(PDO $db,string $raw): array {
     // Public snapshots may otherwise stay stale for minutes; explicit hides must not linger in listings.
     if($changed&&function_exists('shopCacheClear'))try{shopCacheClear();}catch(Throwable){}
     return $ack;
+}
+// 5.7 (owner D-88): public flags from the private routing — the supplier name never leaves SITE. separate_parcel: the supplier
+// ships its own parcel (config separate_parcel_suppliers); cross_sell: offered under every order (cross_sell_supplier_skus:
+// supplier name → supplier articles). Stored in products.data so every reader (catalog, product, cart) sees the same flags.
+function pimV3SyncSupplierFlags(PDO $db,string $id,array $fulfillment,array $articles): void {
+    $low=static fn($s)=>mb_strtolower(trim((string)$s));
+    $separate=array_map($low,array_filter((array)(cfg('separate_parcel_suppliers')??[]),'is_string'));
+    $cross=[];foreach((array)(cfg('cross_sell_supplier_skus')??[]) as $supplier=>$skus)if(is_string($supplier)&&is_array($skus))foreach($skus as $sku)if(is_string($sku))$cross[$low($supplier).'|'.$low($sku)]=true;
+    $flags=['separate_parcel'=>(bool)array_filter($fulfillment,fn($s)=>in_array($low($s),$separate,true)),
+        'cross_sell'=>(bool)array_filter($articles,fn($a)=>isset($cross[$low($a['supplier_name']??'').'|'.$low($a['supplier_sku']??'')]))];
+    $q=$db->prepare('SELECT data FROM products WHERE id=?');$q->execute([$id]);$data=json_decode((string)$q->fetchColumn(),true);if(!is_array($data))return;
+    if(($data['separate_parcel']??false)===$flags['separate_parcel']&&($data['cross_sell']??false)===$flags['cross_sell'])return;
+    $db->prepare('UPDATE products SET data=? WHERE id=?')->execute([json_encode(array_merge($data,$flags),JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),$id]);
 }
