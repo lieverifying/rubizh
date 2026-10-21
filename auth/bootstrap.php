@@ -11,7 +11,8 @@ header('Cache-Control: no-store, private');
 header('Referrer-Policy: no-referrer');
 header('X-Robots-Tag: noindex, nofollow');
 header('X-Content-Type-Options: nosniff');
-header("Content-Security-Policy: default-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self'; font-src 'self'; script-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'");
+// 5.6.3: connect-src 'self' — the cabinet saves the theme and other preferences with fetch to its own site (was blocked).
+header("Content-Security-Policy: default-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self'; font-src 'self'; script-src 'self'; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'");
 session_name('rubizh_customer');
 session_cache_limiter('');
 ini_set('session.use_strict_mode', '1');

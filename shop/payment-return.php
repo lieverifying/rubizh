@@ -23,7 +23,7 @@ try{
  }
  $receipt=shopOrderReceipt($db,$id);
 }catch(Throwable $e){$error=$e instanceof PDOException?'Замовлення тимчасово недоступне. Спробуйте пізніше.':$e->getMessage();}
-?><!doctype html><html lang="uk"><head><script src="/assets/theme.js?v=3"></script><link rel="stylesheet" href="/assets/theme.css?v=2"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>РУБІЖ · замовлення</title><script defer src="/assets/receipt.js"></script><link rel="stylesheet" href="/shop/np-manager.css"><link rel="stylesheet" href="/assets/theme.css?v=2"></head><body><header><a href="/">РУБІЖ</a><a href="/auth/?tab=orders">Мої замовлення</a></header><main class="receipt-shell">
+?><!doctype html><html lang="uk"><head><script src="/assets/theme.js?v=4"></script><link rel="stylesheet" href="/assets/theme.css?v=2"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>РУБІЖ · замовлення</title><script defer src="/assets/receipt.js"></script><link rel="stylesheet" href="/shop/np-manager.css"><link rel="stylesheet" href="/assets/theme.css?v=2"></head><body><header><a href="/">РУБІЖ</a><a href="/auth/?tab=orders">Мої замовлення</a></header><main class="receipt-shell">
 <?php if($error): ?><div class="error" role="alert"><?=esc($error)?></div><?php endif; ?>
 <?php if(isset($receipt)){require __DIR__.'/receipt-view.php';} ?>
 <?php require_once __DIR__.'/../api/seller.php';$managerPhone=preg_replace('/[^0-9+]/','',(string)rubizhSeller()['phone']); ?>

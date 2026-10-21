@@ -1643,3 +1643,18 @@ html body [data-card-sizes]:not(:has([data-card-size])) {display:none}
 
 /* Review of stage 4.1 (a11y): the enlarged search icon target shows the same focus ring as the other header buttons. */
 html body [role="button"][aria-label="Шукати"]:focus-visible {outline:2px solid var(--focus);outline-offset:2px}
+
+/* --- form-fields.2026102101.css --- */
+/* 5.6.3 (owner check, WCAG 1.4.11): every text field, select and textarea has a boundary of at least 3:1 against the surface
+   around it, in both themes — the last layer over the older per-page field styles (sign-in, cabinet, checkout). Focus keeps
+   the accent colour; read-only fields keep their own fill. Light: #6B7568 on white is 3.9–4.8:1 on every light surface;
+   dark: #7C8778 is 4.2–5.2:1 on every dark surface. */
+:root{--field-border:#7C8778;--field-bg:#0E130F;--field-readonly-bg:#1B211B}
+:root[data-theme="light"]{--field-border:#6B7568;--field-bg:#FFFFFF;--field-readonly-bg:#F1F2EE}
+:root input:is([type=text],[type=email],[type=tel],[type=search],[type=number],[type=password],[type=url],[type=date],:not([type])),:root select,:root textarea{border:1px solid var(--field-border)!important;background-color:var(--field-bg)!important}
+:root input[readonly]:is([type=text],[type=email],[type=tel],:not([type])){background-color:var(--field-readonly-bg)!important}
+:root input:is([type=text],[type=email],[type=tel],[type=search],[type=number],[type=password],[type=url],[type=date],:not([type])):focus,:root select:focus,:root textarea:focus{border-color:var(--accent)!important}
+/* Search boxes: the field sits inside its own framed box (icon + field) — the box carries the boundary, the field none. */
+:root div:has(> input[type=search]){border-color:var(--field-border)!important}
+:root div:has(> input[type=search]) > input[type=search]{border-color:transparent!important;background-color:transparent!important}
+:root div:has(> input[type=search]:focus){border-color:var(--accent)!important}

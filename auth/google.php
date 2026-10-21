@@ -42,6 +42,8 @@ try {
     authPendingSet($claims+['actor'=>$flow['actor']]);
     header('Location: /auth/?phone=1',true,303); exit;
 } catch (Throwable $e) {
+    // 5.6.3: the cause reaches the PHP log (class and place); the buyer keeps the short message.
+    error_log('rubizh google sign-in: '.get_class($e).' at '.basename($e->getFile()).':'.$e->getLine());
     $_SESSION['auth_error']=$e instanceof RuntimeException && !($e instanceof PDOException) ? $e->getMessage() : 'Вхід тимчасово недоступний. Спробуйте пізніше.';
     header('Location: /auth/',true,303); exit;
 }
