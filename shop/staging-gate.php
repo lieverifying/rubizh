@@ -49,6 +49,18 @@ function rubizhStagingKeyRequest(): bool {
     $ok=false;foreach([$all['pim_key']??'',$all['pim_key_next']??''] as $k)if(is_string($k)&&strlen($k)>=24&&hash_equals($k,$m[1]))$ok=true;
     return $ok;
 }
+// Stage 5.6.1 (hosting): the key travels in Authorization, so the browser first sends a CORS preflight without it. Only a
+// real preflight (OPTIONS + Access-Control-Request-Method) from a configured PIM origin to /api/pim/… passes; it carries no
+// data — api/lib.php cors() answers 204 and exits. A '*' origin list does not open the preflight (exact origins only).
+function rubizhStagingPimPreflight(): bool {
+    if(($_SERVER['REQUEST_METHOD']??'')!=='OPTIONS'||trim((string)($_SERVER['HTTP_ACCESS_CONTROL_REQUEST_METHOD']??''))==='')return false;
+    $uri=(string)($_SERVER['REQUEST_URI']??'/');$path=(string)parse_url($uri,PHP_URL_PATH);
+    if(!str_starts_with($path,'/api/pim/')||str_contains($path,'..')||stripos($uri,'%2e')!==false||str_contains($path,'\\'))return false;
+    $origin=(string)($_SERVER['HTTP_ORIGIN']??'');if($origin==='')return false;
+    $f=$GLOBALS['rubizh_config_file']??dirname(__DIR__).'/api/config.php';$all=is_file($f)?(require $f):[];
+    $allowed=is_array($all)&&is_array($all['pim_origins']??null)?$all['pim_origins']:[];
+    return in_array($origin,$allowed,true);
+}
 // Stage 5.6-3 (D-84): the bank calls the webhook without the password. Only POST to the exact path, without a query,
 // dot segments or encoded characters, and with a signature header; shop/mono-webhook.php verifies the signature itself.
 function rubizhStagingBankWebhook(): bool {
@@ -66,6 +78,7 @@ function rubizhStagingGate(): void {
         echo "Сайт тимчасово недоступний.\n";exit;
     }
     if(rubizhStagingKeyRequest()){$GLOBALS['rubizh_staging_gate_passed']=true;return;}
+    if(rubizhStagingPimPreflight()){$GLOBALS['rubizh_staging_gate_passed']=true;return;}
     if(rubizhStagingBankWebhook()){$GLOBALS['rubizh_staging_gate_passed']=true;return;}
     [$user,$password]=rubizhStagingCredentials();$g=$c['gate'];
     if(hash_equals((string)$g['user'],$user)&&password_verify($password,(string)$g['password_hash'])){$GLOBALS['rubizh_staging_gate_passed']=true;return;}

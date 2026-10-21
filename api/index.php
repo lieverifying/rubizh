@@ -15,6 +15,8 @@ $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
 $path = '/' . trim(preg_replace('~^.*?/api~', '', $path), '/');
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $isPim = str_starts_with($path, '/pim/');
+// 5.6.1: the closed-mode gate lets the PIM CORS preflight through (shop/staging-gate.php) because cors() answers OPTIONS
+// with 204 and exits here, before any work. Keep cors() first.
 cors($isPim);
 if(!$isPim){rubizhPublicGate('catalog');rubizhHttpWork('public-read',16);$GLOBALS['rubizh_public_query_budget']=true;}
 
